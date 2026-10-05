@@ -300,8 +300,8 @@ export const MenuManagement: React.FC = () => {
 
     setSaving(true);
     try {
-      const assignedIds = Array.from(new Set(itemForm.categoryIds.length > 0 ? itemForm.categoryIds : [categories[0]?.id || 'general']));
-      const assignedNames = assignedIds
+      const assignedIds: string[] = Array.from(new Set<string>(itemForm.categoryIds.length > 0 ? itemForm.categoryIds : [categories[0]?.id || 'general']));
+      const assignedNames: string[] = assignedIds
         .map((cid) => categories.find((c) => c.id === cid)?.categoryName)
         .filter((n): n is string => Boolean(n));
 
@@ -317,7 +317,7 @@ export const MenuManagement: React.FC = () => {
         itemNameTamil: itemForm.itemNameTamil.trim() || getTamilItemName(englishName),
         categoryIds: assignedIds,
         categoryNames: assignedNames,
-        categoryId: assignedIds[0],
+        categoryId: assignedIds[0] || 'general',
         categoryName: assignedNames.join(', ') || 'General',
         nonAcPrice: nonAc,
         acPrice: ac,
