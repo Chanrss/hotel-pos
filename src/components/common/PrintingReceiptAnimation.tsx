@@ -229,8 +229,12 @@ export const PrintingReceiptAnimation: React.FC<PrintingReceiptAnimationProps> =
               </div>
 
               <div className="flex justify-between font-bold text-[9px] text-black">
-                <span>Bill: BN-{billNumber}</span>
-                <span>Date: {new Date().toLocaleDateString('en-GB')}</span>
+                <span>Bill No: BN-{billNumber}</span>
+                <span>Time: {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+              </div>
+              <div className="flex justify-between font-bold text-[8.5px] text-slate-700">
+                <span>Order: {currentBill?.orderType === 'TAKE_AWAY' ? 'Takeaway' : 'Dine-In'}</span>
+                <span>Captain: {currentBill?.waiterCode || currentBill?.captainCode || '01'}</span>
               </div>
 
               {/* Items Feed Animation */}

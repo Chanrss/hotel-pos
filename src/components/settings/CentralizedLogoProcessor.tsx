@@ -902,9 +902,6 @@ export const CentralizedLogoProcessor: React.FC<CentralizedLogoProcessorProps> =
 
                 {/* Restaurant Name */}
                 <div className="font-extrabold text-[15px] leading-tight text-black tracking-wide uppercase">
-                  {settings.restaurantNameTamil || 'ஸ்ரீ சரவண பவன்'}
-                </div>
-                <div className="text-[10px] font-bold text-slate-800 uppercase mt-0.5">
                   {settings.restaurantName || 'SRI SARAVANA BHAVAN'}
                 </div>
                 <div className="text-[9px] text-slate-700 leading-tight mt-1">

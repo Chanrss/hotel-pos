@@ -195,7 +195,7 @@ export const ReceiptDesignerSection: React.FC<ReceiptDesignerSectionProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
-              Bilingual Tamil/English headers, complete item tables with serial numbers, net summary, and clear totals.
+              Complete item tables with serial numbers, net summary, and clear totals.
             </p>
           </button>
 
@@ -247,7 +247,7 @@ export const ReceiptDesignerSection: React.FC<ReceiptDesignerSectionProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
-              Big bold Token/Bill number banner at top, enlarged Tamil items, quick kitchen or self-service pickup.
+              Big bold Token/Bill number banner at top, enlarged items, quick kitchen or self-service pickup.
             </p>
           </button>
 
@@ -372,7 +372,7 @@ export const ReceiptDesignerSection: React.FC<ReceiptDesignerSectionProps> = ({
               {[
                 { id: 'normal', label: 'Standard' },
                 { id: 'large', label: 'Large' },
-                { id: 'prominent', label: 'Bold Tamil' }
+                { id: 'prominent', label: 'Prominent' }
               ].map((s) => (
                 <button
                   key={s.id}
@@ -676,20 +676,6 @@ export const ReceiptDesignerSection: React.FC<ReceiptDesignerSectionProps> = ({
               type="checkbox"
               checked={formData.receiptShowTotalQty !== false}
               onChange={(e) => setFormData(prev => ({ ...prev, receiptShowTotalQty: e.target.checked }))}
-              className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-            />
-          </label>
-
-          {/* Show English Brand Name */}
-          <label className="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-700 transition-colors">
-            <div className="space-y-0.5">
-              <div className="font-bold text-xs text-slate-200">Bilingual English Sub-Title</div>
-              <div className="text-[10px] text-slate-500">Print English name below Tamil title</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={Boolean(formData.receiptShowEnglishName)}
-              onChange={(e) => setFormData(prev => ({ ...prev, receiptShowEnglishName: e.target.checked }))}
               className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
             />
           </label>

@@ -369,11 +369,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigate }) =>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">
               {settings?.restaurantName || 'SRI SARAVANA BHAVAN'}
             </h2>
-            {settings?.restaurantNameTamil && (
-              <p className="text-xs text-amber-700 font-bold mt-0.5">
-                {settings.restaurantNameTamil}
-              </p>
-            )}
           </div>
         </div>
 

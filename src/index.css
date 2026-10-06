@@ -4,22 +4,22 @@
 /* Dedicated Restaurant POS Terminal Theme: Clean, Compact & High-Contrast */
 @theme {
   --spacing: 0.25rem;
-  --text-2xs: 0.6875rem;
-  --text-2xs--line-height: 1rem;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1.1rem;
-  --text-sm: 0.84375rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 0.9375rem;
-  --text-base--line-height: 1.375rem;
-  --text-lg: 1.0625rem;
-  --text-lg--line-height: 1.5rem;
-  --text-xl: 1.2rem;
-  --text-xl--line-height: 1.65rem;
-  --text-2xl: 1.45rem;
-  --text-2xl--line-height: 1.85rem;
-  --text-3xl: 1.75rem;
-  --text-3xl--line-height: 2.15rem;
+  --text-2xs: 0.78rem;
+  --text-2xs--line-height: 1.1rem;
+  --text-xs: 0.85rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.95rem;
+  --text-sm--line-height: 1.35rem;
+  --text-base: 1.05rem;
+  --text-base--line-height: 1.45rem;
+  --text-lg: 1.18rem;
+  --text-lg--line-height: 1.6rem;
+  --text-xl: 1.32rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.55rem;
+  --text-2xl--line-height: 1.95rem;
+  --text-3xl: 1.85rem;
+  --text-3xl--line-height: 2.25rem;
 }
 
 /* HTML & Body root responsive and smooth touch scrolling */
@@ -29,8 +29,8 @@ html, body {
   width: 100%;
   margin: 0;
   padding: 0;
-  font-size: 14.5px;
-  line-height: 1.4;
+  font-size: 16px;
+  line-height: 1.42;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-overflow-scrolling: touch;
@@ -42,13 +42,13 @@ html, body {
 
 @media screen {
   html {
-    font-size: 14.5px !important;
+    font-size: 16px !important;
     width: 100% !important;
     height: 100% !important;
   }
   body {
     font-size: 1rem !important;
-    line-height: 1.4 !important;
+    line-height: 1.42 !important;
     width: 100% !important;
     height: 100% !important;
   }
@@ -56,8 +56,30 @@ html, body {
 
 @media screen and (min-width: 1440px) {
   html {
-    font-size: 15px !important;
+    font-size: 16.5px !important;
   }
+}
+
+/* Slightly larger text for micro utility classes across all POS screens */
+#root .text-\[9px\],
+#root .text-\[9\.5px\] {
+  font-size: 11px !important;
+}
+#root .text-\[10px\],
+#root .text-\[10\.5px\] {
+  font-size: 12px !important;
+}
+#root .text-\[11px\],
+#root .text-\[11\.5px\] {
+  font-size: 13px !important;
+}
+#root .text-\[12px\],
+#root .text-\[12\.5px\] {
+  font-size: 14px !important;
+}
+#root .text-\[13px\],
+#root .text-\[13\.5px\] {
+  font-size: 15px !important;
 }
 
 #root {

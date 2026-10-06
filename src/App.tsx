@@ -115,7 +115,7 @@ const AppContent: React.FC = () => {
         watermarkUseLogo: merged.watermarkUseLogo !== undefined ? merged.watermarkUseLogo : true,
         receiptLogoMaxWidth: (merged.receiptLogoMaxWidth && merged.receiptLogoMaxWidth >= 40) ? merged.receiptLogoMaxWidth : 100,
         receiptLogoMaxHeight: (merged.receiptLogoMaxHeight && merged.receiptLogoMaxHeight >= 40) ? merged.receiptLogoMaxHeight : 65,
-        logoDisplay: isLogoRemoved ? 'none' : ((merged.watermarkEnabled !== false) ? 'both' : 'header'),
+        logoDisplay: isLogoRemoved ? 'none' : ((merged.watermarkEnabled !== false) ? 'watermark' : 'none'),
         watermarkOpacity: merged.watermarkOpacity !== undefined ? merged.watermarkOpacity : 0.12,
         compactMode: merged.compactMode !== undefined ? Boolean(merged.compactMode) : false,
         autoPrintOnSave: merged.autoPrintOnSave !== undefined ? merged.autoPrintOnSave : true,

@@ -69,8 +69,8 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
   });
 
   const [activeLogoDisplay, setActiveLogoDisplay] = useState<'watermark' | 'header' | 'both' | 'none'>(() => {
-    if (settings?.logoDisplay && settings.logoDisplay !== 'watermark') return settings.logoDisplay;
-    return 'both';
+    if (settings?.logoDisplay === 'none') return 'none';
+    return 'watermark';
   });
   const [logoLoadError, setLogoLoadError] = useState(false);
 
@@ -85,7 +85,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
     if (settings?.receiptLogoMaxWidth) setLogoMaxWidth(settings.receiptLogoMaxWidth);
     if (settings?.receiptLogoMaxHeight) setLogoMaxHeight(settings.receiptLogoMaxHeight);
     if (settings?.logoDisplay) {
-      setActiveLogoDisplay(settings.logoDisplay === 'watermark' ? 'both' : settings.logoDisplay);
+      setActiveLogoDisplay(settings.logoDisplay === 'none' ? 'none' : 'watermark');
     }
   }, [settings?.receiptLogoMaxWidth, settings?.receiptLogoMaxHeight, settings?.logoDisplay]);
 
@@ -415,57 +415,21 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                 </div>
               )}
 
-              {/* Receipt Content Container */}
+              {/* Receipt Content Container (Watermark Alone - No Top Header Logo) */}
               <div className="relative z-10">
-                {(activeLogoDisplay === 'header' || activeLogoDisplay === 'both') && (
-                  <div 
-                    className="receipt-logo-container mb-2"
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      textAlign: 'center',
-                      margin: '0 auto 6px auto'
-                    }}
-                  >
-                    {logoLoadError ? (
-                      <div className="receipt-logo-error text-red-600 font-bold text-center text-xs py-1.5 px-2 border border-red-300 bg-red-50 rounded my-1 max-w-[220px] mx-auto">
-                        Original logo asset is unavailable
-                      </div>
-                    ) : (
-                      <img 
-                        id="preview-header-logo"
-                        src={originalLogoUrl} 
-                        alt="Sri Saravana Bhavan Official Logo" 
-                        onError={() => setLogoLoadError(true)}
-                        style={{
-                          maxWidth: `var(--receipt-logo-max-width, ${logoMaxWidth}px)`,
-                          maxHeight: `var(--receipt-logo-max-height, ${logoMaxHeight}px)`,
-                          width: 'auto',
-                          height: 'auto',
-                          objectFit: 'contain',
-                          display: 'block',
-                          marginLeft: 'auto',
-                          marginRight: 'auto'
-                        }}
-                        className="receipt-logo drop-shadow-xs"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                  </div>
-                )}
 
-              {/* 1. Header: Hotel Name in Tamil ONLY, Address lines, Phone Number */}
-              <div className={`mb-1.5 ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
-                <div className="font-extrabold text-[19px] sm:text-[21px] tracking-wide text-black leading-tight font-sans">
+              {/* 1. Header: Hotel Name in Tamil ONLY, Compact Address lines, Phone Number */}
+              <div className={`mb-1 ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
+                <div className="font-extrabold text-[20px] sm:text-[22px] tracking-wide text-black leading-tight font-sans mb-0.5">
                   {hotelNameTamil}
                 </div>
-                <div className="text-[11px] sm:text-[11.5px] text-black mt-0.5 leading-tight space-y-0.5">
+                <div className="text-[12px] sm:text-[12.5px] text-black leading-[1.02]">
                   {addressLines.map((line, idx) => (
-                    <div key={idx}>{line}</div>
+                    <div key={idx} className="leading-[1.02] m-0 p-0">{line}</div>
                   ))}
-                  <div>PH: {phone}</div>
+                  <div className="leading-[1.05] mt-0.5">PH: {phone}</div>
                   {(settings?.gstNumber || settings?.fssaiNumber) && (
-                    <div className="font-semibold text-slate-800 text-[9px] sm:text-[9.5px] mt-0.5">
+                    <div className="font-semibold text-slate-800 text-[10px] sm:text-[10.5px] leading-[1.05] mt-0.5">
                       {settings?.gstNumber ? `GSTIN: ${settings.gstNumber}` : ''}
                       {(settings?.gstNumber && settings?.fssaiNumber) ? ' | ' : ''}
                       {settings?.fssaiNumber ? `FSSAI: ${settings.fssaiNumber}` : ''}
@@ -475,28 +439,28 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               </div>
 
               {(isReprint || bill.reprintCount > 0) && (
-                <div className="text-center border border-black py-0.5 my-1 text-[10px] font-black uppercase tracking-wider bg-slate-50">
+                <div className="text-center border border-black py-0.5 my-1 text-[10.5px] font-black uppercase tracking-wider bg-slate-50">
                   *** DUPLICATE / REPRINT ({bill.reprintCount ? (isReprint ? bill.reprintCount + 1 : bill.reprintCount) : 1}) ***
                 </div>
               )}
 
-              {/* 2. Bill Meta: Bill No, Date in single line and Cap No, Time in single line */}
-              <div className="my-1.5 py-1 border-t border-b border-dashed border-black text-[11.5px] sm:text-[12.5px] space-y-0.5">
+              {/* 2. Bill Meta: Bill No + Time in single line and Order Type + Captain Code in single line */}
+              <div className="my-1.5 py-1 border-t border-b border-dashed border-black text-[12.5px] sm:text-[13.5px] space-y-0.5">
                 <div className="flex justify-between items-center font-bold text-black">
                   <span>Bill No : BN-{cleanBillNo}</span>
                   <span className="sr-only">Bill No: #{bill.billNumber}</span>
-                  <span>Date : {dateFormatted}</span>
-                </div>
-                <div className="flex justify-between items-center text-black">
-                  <span>Cap No : {captainNumber}{tableNo ? ` (${tableNo})` : ''}</span>
                   <span>Time : {timeFormatted}</span>
+                </div>
+                <div className="flex justify-between items-center text-black font-semibold">
+                  <span>Order : {bill.orderType === 'TAKE_AWAY' ? 'Takeaway' : `Dine-In${tableNo ? ` (${tableNo})` : ''}`}</span>
+                  <span>Captain : {captainNumber || '01'}</span>
                 </div>
               </div>
 
               {/* 3. Items Table: Item Number (#), Item Name in Tamil (BOLD, INCREASED SIZE), Qty (BOLD, INCREASED SIZE), Price (BOLD, INCREASED), Total (BOLD, INCREASED) */}
               <table className="w-full my-1 border-collapse table-fixed" style={{ tableLayout: 'fixed' }}>
                 <thead>
-                  <tr className="text-left text-black border-y border-black font-bold text-[12px] sm:text-[13px]">
+                  <tr className="text-left text-black border-y border-black font-bold text-[13px] sm:text-[14px]">
                     <th className="py-1 font-bold w-[8%] text-left whitespace-nowrap">#</th>
                     <th className="py-1 pr-1 font-bold w-[44%] text-left break-words">பொருள்</th>
                     <th className="py-1 text-right font-bold w-[14%] whitespace-nowrap">Qty</th>
@@ -510,17 +474,17 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                     const displayName = tamilName || item.itemName;
                     return (
                       <tr key={idx} className="align-top">
-                        <td className="py-1 font-mono text-black text-left text-[12px] sm:text-[13px] whitespace-nowrap align-top">{idx + 1}</td>
+                        <td className="py-1 font-mono text-black text-left text-[13px] sm:text-[14px] whitespace-nowrap align-top">{idx + 1}</td>
                         <td className="py-1 pr-1 text-black leading-snug break-words align-top">
-                          <div className="font-black text-black font-sans text-[15px] sm:text-[16px] text-left break-words leading-tight">{displayName}</div>
+                          <div className="font-black text-black font-sans text-[16px] sm:text-[17px] text-left break-words leading-tight">{displayName}</div>
                         </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[14.5px] sm:text-[15.5px] whitespace-nowrap align-top">
+                        <td className="py-1 text-right font-mono font-black text-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap align-top">
                           {Number(item.quantity).toFixed(0)}
                         </td>
-                        <td className="py-1 text-right font-mono text-black font-bold text-[13.5px] sm:text-[14.5px] whitespace-nowrap align-top">
+                        <td className="py-1 text-right font-mono text-black font-bold text-[14.5px] sm:text-[15.5px] whitespace-nowrap align-top">
                           {Number(item.unitPrice).toFixed(2)}
                         </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[14.5px] sm:text-[15.5px] whitespace-nowrap align-top">
+                        <td className="py-1 text-right font-mono font-black text-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap align-top">
                           {Number(item.totalPrice).toFixed(2)}
                         </td>
                       </tr>
@@ -530,13 +494,13 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               </table>
 
               {/* 4. Total Qty next to Item Total */}
-              <div className="space-y-0.5 text-[12.5px] sm:text-[13.5px] my-1 pt-1 border-t border-slate-300">
+              <div className="space-y-0.5 text-[13.5px] sm:text-[14.5px] my-1 pt-1 border-t border-slate-300">
                 <div className="flex justify-between items-center text-black font-bold whitespace-nowrap">
-                  <span className="whitespace-nowrap">Total Qty : <span className="font-mono font-black text-[14.5px] sm:text-[15.5px] whitespace-nowrap">{totalQty.toFixed(0)}</span></span>
-                  <span className="whitespace-nowrap">Item Total : <span className="font-mono font-black text-[14.5px] sm:text-[15.5px] whitespace-nowrap">₹{Number(bill.subtotal).toFixed(2)}</span></span>
+                  <span className="whitespace-nowrap">Total Qty : <span className="font-mono font-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap">{totalQty.toFixed(0)}</span></span>
+                  <span className="whitespace-nowrap">Item Total : <span className="font-mono font-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap">₹{Number(bill.subtotal).toFixed(2)}</span></span>
                 </div>
                 {bill.discount > 0 && (
-                  <div className="flex justify-between items-center text-red-700 font-semibold text-[11.5px]">
+                  <div className="flex justify-between items-center text-red-700 font-semibold text-[12.5px]">
                     <span>Discount :</span>
                     <span className="font-mono font-bold">-₹{Number(bill.discount).toFixed(2)}</span>
                   </div>
@@ -545,11 +509,11 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
 
               {/* 5. Grand Total (BOLD & PROMINENT) and Footer Line */}
               <div className={`my-2 pt-2 border-t-2 border-black ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
-                <div className="font-black text-[20px] sm:text-[22px] text-black tracking-wide py-0.5">
+                <div className="font-black text-[21px] sm:text-[23px] text-black tracking-wide py-0.5">
                   GRAND TOTAL: ₹{Number(bill.grandTotal).toFixed(2)}
                   <span className="sr-only">₹{bill.grandTotal}</span>
                 </div>
-                <div className="text-[11px] sm:text-[11.5px] font-bold text-black mt-1 tracking-wider">
+                <div className="text-[12px] sm:text-[12.5px] font-bold text-black mt-1 tracking-wider">
                   {receiptFooter}
                   <span className="sr-only">Thank you</span>
                 </div>

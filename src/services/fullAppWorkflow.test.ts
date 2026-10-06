@@ -249,7 +249,7 @@ describe('Full POS Lifecycle Automated End-to-End Suite', () => {
     expect(thermalHtml).toContain('T-3');
     expect(thermalHtml).toContain('மசால் தோசை');
     expect(thermalHtml).toContain('ஃபில்டர் காபி');
-    expect(thermalHtml).toContain('170.00');
+    expect(thermalHtml).toContain('₹170');
   });
 
   it('validates Direct Billing quick-counter checkout without table requirement', () => {

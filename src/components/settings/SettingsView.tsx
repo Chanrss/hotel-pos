@@ -134,7 +134,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       watermarkOpacity: typeof raw.watermarkOpacity === 'number' ? raw.watermarkOpacity : 0.12,
       receiptLogoMaxWidth: raw.receiptLogoMaxWidth || 100,
       receiptLogoMaxHeight: raw.receiptLogoMaxHeight || 65,
-      logoDisplay: isLogoRemoved ? 'none' : ((raw.watermarkEnabled !== false) ? 'both' : 'header'),
+      logoDisplay: isLogoRemoved ? 'none' : ((raw.watermarkEnabled !== false) ? 'watermark' : 'none'),
       compactMode: false,
       autoPrintOnSave: true,
       updatedAt: Date.now()
@@ -197,7 +197,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       watermarkOpacity: merged.watermarkOpacity !== undefined ? merged.watermarkOpacity : 0.12,
       receiptLogoMaxWidth: merged.receiptLogoMaxWidth || 100,
       receiptLogoMaxHeight: merged.receiptLogoMaxHeight || 65,
-      logoDisplay: isLogoRemoved ? 'none' : ((merged.watermarkEnabled !== false) ? 'both' : 'header'),
+      logoDisplay: isLogoRemoved ? 'none' : ((merged.watermarkEnabled !== false) ? 'watermark' : 'none'),
       compactMode: false,
       autoPrintOnSave: true,
       updatedAt: Date.now()
@@ -225,12 +225,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
   const lastPrintOutcome = diagState.lastPrint;
   const lastPrintErrorMsg = diagState.lastError;
 
+  const formDataRef = useRef<RestaurantSettings>(formData);
+  formDataRef.current = formData;
+
   useEffect(() => {
     if (initialSettings) {
       setFormData((prev) => {
         const isLogoRemoved = initialSettings.logoRemoved !== undefined ? Boolean(initialSettings.logoRemoved) : Boolean(prev.logoRemoved);
         const defaultAlign: AlignOption = initialSettings.receiptAlignment || prev.receiptAlignment || 'center';
-        return {
+        const nextState = {
           ...prev,
           ...initialSettings,
           logoRemoved: isLogoRemoved,
@@ -256,31 +259,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           watermarkEnabled: initialSettings.watermarkEnabled !== undefined ? initialSettings.watermarkEnabled : (prev.watermarkEnabled ?? true),
           watermarkUseLogo: initialSettings.watermarkUseLogo !== undefined ? initialSettings.watermarkUseLogo : (prev.watermarkUseLogo ?? true)
         };
+        formDataRef.current = nextState;
+        return nextState;
       });
     }
   }, [initialSettings]);
 
   // Persist locally, notify App immediately, and sync to Firebase Firestore whenever formData changes
   const updateSettingsImmediate = (updater: (prev: RestaurantSettings) => RestaurantSettings) => {
-    setFormData((prev) => {
-      const next = updater(prev);
-      const synced = buildSanitizedSettingsPayload(next);
-      try {
-        localStorage.setItem('pos_restaurant_settings', JSON.stringify(synced));
-        window.dispatchEvent(new CustomEvent('pos-settings-updated', { detail: synced }));
-      } catch (_) {}
+    const next = updater(formDataRef.current);
+    const synced = buildSanitizedSettingsPayload(next);
+    formDataRef.current = synced;
+    setFormData(synced);
 
-      if (firebaseSyncTimerRef.current) {
-        clearTimeout(firebaseSyncTimerRef.current);
-      }
-      firebaseSyncTimerRef.current = setTimeout(() => {
-        setDoc(doc(db, 'settings', 'restaurant'), synced, { merge: true }).catch(() => {
-          // Offline / sandbox fallback already cached in localStorage
-        });
-      }, 300);
+    try {
+      localStorage.setItem('pos_restaurant_settings', JSON.stringify(synced));
+      window.dispatchEvent(new CustomEvent('pos-settings-updated', { detail: synced }));
+    } catch (_) {}
 
-      return synced;
-    });
+    if (firebaseSyncTimerRef.current) {
+      clearTimeout(firebaseSyncTimerRef.current);
+    }
+    firebaseSyncTimerRef.current = setTimeout(() => {
+      setDoc(doc(db, 'settings', 'restaurant'), synced, { merge: true }).catch(() => {
+        // Offline / sandbox fallback already cached in localStorage
+      });
+    }, 300);
   };
 
   useEffect(() => {
@@ -314,7 +318,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
         logoUrl: optimizedDataUrl,
         logoStorageUrl: optimizedDataUrl,
         logoRemoved: false,
-        logoDisplay: prev.watermarkEnabled ? 'both' : 'header'
+        logoDisplay: 'watermark'
       }));
       setNotification({
         type: 'success',

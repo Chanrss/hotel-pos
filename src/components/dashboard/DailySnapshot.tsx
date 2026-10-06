@@ -319,11 +319,6 @@ export const DailySnapshot: React.FC<DailySnapshotProps> = ({
                     <h4 className="text-base sm:text-lg font-black text-slate-900 truncate">
                       {topSellingItem.itemName}
                     </h4>
-                    {topSellingItem.itemNameTamil && (
-                      <span className="text-xs font-semibold text-slate-500">
-                        ({topSellingItem.itemNameTamil})
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-mono font-bold text-xs">

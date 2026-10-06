@@ -69,7 +69,7 @@ export class PrinterService {
       ? Boolean(settings.watermarkEnabled)
       : (settings?.logoDisplay === 'watermark' || settings?.logoDisplay === 'both' || settings?.logoDisplay === undefined);
     const watermarkUseLogo = settings?.watermarkUseLogo !== false;
-    const showHeaderLogo = !isLogoRemoved && Boolean(logoUrl) && settings?.logoDisplay !== 'none';
+    const showHeaderLogo = false;
     const watermarkOpacity = settings?.watermarkOpacity !== undefined ? settings.watermarkOpacity : 0.12;
     const defaultDim = is58mm ? 70 : 95;
     const storedW = typeof window !== 'undefined' ? Number(localStorage.getItem('pos_receipt_logo_max_width')) : 0;
@@ -96,22 +96,22 @@ export class PrinterService {
     const baseFontSize = isCompact ? Math.max(9, Math.round(clampedFontSize * 0.92 * 10) / 10) : clampedFontSize;
     const totalQty = items.reduce((sum, itm) => sum + itm.quantity, 0);
 
-    const headerScaleMap = { normal: 1.25, large: 1.4, huge: 1.6 };
+    const headerScaleMap = { normal: 1.35, large: 1.5, huge: 1.7 };
     const headerScale = headerScaleMap[settings?.receiptHeaderFontSize || 'normal'];
     const titleFontSize = Math.round(baseFontSize * headerScale * 10) / 10;
 
-    const itemScaleMap = { normal: 1.0, large: 1.1, prominent: 1.2 };
+    const itemScaleMap = { normal: 1.15, large: 1.25, prominent: 1.35 };
     const itemScale = itemScaleMap[settings?.receiptItemFontSize || 'normal'];
     const itemFontSize = Math.round(baseFontSize * itemScale * 10) / 10;
 
-    const totalScaleMap = { normal: 1.2, large: 1.35, huge: 1.5 };
+    const totalScaleMap = { normal: 1.3, large: 1.45, huge: 1.6 };
     const totalScale = totalScaleMap[settings?.receiptTotalFontSize || 'normal'];
     const totalFontSize = Math.round(baseFontSize * totalScale * 10) / 10;
 
-    const headerFontSize = Math.round(baseFontSize * 1.0 * 10) / 10;
-    const metaFontSize = Math.round(baseFontSize * 0.96 * 10) / 10;
-    const priceFontSize = Math.round(baseFontSize * 1.0 * 10) / 10;
-    const smallFontSize = Math.round(baseFontSize * 0.85 * 10) / 10;
+    const headerFontSize = Math.round(baseFontSize * 1.08 * 10) / 10;
+    const metaFontSize = Math.round(baseFontSize * 1.04 * 10) / 10;
+    const priceFontSize = Math.round(baseFontSize * 1.1 * 10) / 10;
+    const smallFontSize = Math.round(baseFontSize * 0.9 * 10) / 10;
 
     const lineSpacingMap = { tight: '1.15', normal: '1.22', relaxed: '1.35' };
     const lineHeightVal = lineSpacingMap[settings?.receiptLineSpacing || 'normal'];
@@ -242,6 +242,7 @@ export class PrinterService {
       object-fit: contain;
       display: block;
       filter: grayscale(100%);
+      transform: translate(${logoOffsetX}px, ${logoOffsetY}px);
     }
     .watermark-text {
       font-size: 16px;
@@ -277,28 +278,34 @@ export class PrinterService {
     }
     .center { text-align: center; }
     .bold { font-weight: bold; }
-    .header { margin-bottom: 3px; }
+    .header { margin-bottom: 2px; }
     .restaurant-title { 
       font-size: var(--receipt-title-font-size, ${titleFontSize}px); 
       font-weight: ${boldRestaurantName ? '800' : '400'}; 
       text-align: ${shopNameAlignment};
-      margin-bottom: 1px; 
+      margin-bottom: 2px; 
       letter-spacing: 0.2px;
       line-height: 1.18;
     }
     .address-section {
       font-size: var(--receipt-meta-font-size, ${metaFontSize}px);
       text-align: ${addressAlignment};
-      line-height: 1.2;
+      line-height: 1.02;
       color: #000;
-      margin-bottom: 1px;
+      margin-bottom: 0px;
+    }
+    .address-section div {
+      line-height: 1.02;
+      margin: 0;
+      padding: 0;
     }
     .phone-section {
       font-size: var(--receipt-meta-font-size, ${metaFontSize}px);
       text-align: ${phoneAlignment};
-      line-height: 1.2;
+      line-height: 1.05;
       color: #000;
-      margin-bottom: 2px;
+      margin-top: 1px;
+      margin-bottom: 1px;
     }
     .meta-section {
       margin: ${sectionSpacingVal};
@@ -409,16 +416,9 @@ export class PrinterService {
 
       <!-- 1. Header: Restaurant Name, Address, Phone -->
       <div class="header">
-        ${showTamilName && settings?.restaurantNameTamil ? `
-          <div class="restaurant-title">
-            ${hotelNameTamil}
-          </div>
-        ` : ''}
-        ${(showEnglishName || !settings?.restaurantNameTamil) ? `
-          <div class="restaurant-title" style="font-size: ${Math.round(titleFontSize * 0.92)}px; text-transform: uppercase;">
-            ${restaurantName}
-          </div>
-        ` : ''}
+        <div class="restaurant-title">
+          ${hotelNameTamil}
+        </div>
         ${showAddress ? `
           <div class="address-section">
             ${addressLines.map(line => `<div>${line}</div>`).join('')}
@@ -442,12 +442,15 @@ export class PrinterService {
 
       <!-- 2. Bill Header Meta -->
       <div class="meta-section">
-        <div class="meta-line" style="font-weight: ${boldBillNumber ? '800' : '400'};">
-          Bill No: ${cleanBillNo}
-          <span style="display: none;">Bill No: #${bill.billNumber}</span>
+        <div class="meta-line" style="display: flex; justify-content: space-between; align-items: center; font-weight: ${boldBillNumber ? '800' : '400'};">
+          <span>Bill No: ${cleanBillNo}<span style="display: none;">Bill No: #${bill.billNumber}</span></span>
+          <span>Time: ${timeFormatted}</span>
         </div>
-        <div class="meta-line">Date: ${dateFormatted}</div>
-        <div class="meta-line">Time: ${timeFormatted}${tableNo ? ` | Table: ${tableNo}` : ''}${captainNumber ? ` | Cap: ${captainNumber}` : ''}</div>
+        <div class="meta-line" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Order: ${bill.orderType === 'TAKE_AWAY' ? 'Takeaway' : `Dine-In${tableNo ? ` (${tableNo})` : ''}`}</span>
+          <span>Captain: ${captainNumber || '01'}</span>
+        </div>
+        <div class="meta-line" style="display: none;">Date: ${dateFormatted}</div>
       </div>
 
       <!-- 3. Items Table -->
@@ -944,11 +947,11 @@ export class PrinterService {
         billId: 'test-receipt-001',
         itemId: 'sample-1',
         itemCode: '101',
-        itemName: 'Rice',
-        itemNameTamil: 'Rice',
+        itemName: 'Masala Dosa',
+        itemNameTamil: 'மசால் தோசை',
         quantity: 2,
-        unitPrice: 160,
-        totalPrice: 320,
+        unitPrice: 80,
+        totalPrice: 160,
         priceType: 'NON_AC',
         createdAt: now
       },
@@ -957,8 +960,8 @@ export class PrinterService {
         billId: 'test-receipt-001',
         itemId: 'sample-2',
         itemCode: '102',
-        itemName: 'Juice',
-        itemNameTamil: 'Juice',
+        itemName: 'Filter Coffee',
+        itemNameTamil: 'ஃபில்டர் காபி',
         quantity: 1,
         unitPrice: 80,
         totalPrice: 80,
@@ -1138,7 +1141,7 @@ export class PrinterService {
             createdAt: kot.createdAt
           },
           items: items.map((ki) => ({
-            itemName: ki.itemNameTamil ? `${ki.itemNameTamil} (${ki.itemName})` : ki.itemName,
+            itemName: ki.itemName,
             quantity: ki.quantity,
             totalPrice: 0
           }))

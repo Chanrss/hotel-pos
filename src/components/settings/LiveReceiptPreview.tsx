@@ -16,8 +16,8 @@ export interface LiveReceiptPreviewProps {
 }
 
 const PREVIEW_ITEMS = [
-  { id: '1', name: 'Rice', qty: 2, price: 160, total: 320 },
-  { id: '2', name: 'Juice', qty: 1, price: 80, total: 80 }
+  { id: '1', name: 'மசால் தோசை', qty: 2, price: 80, total: 160 },
+  { id: '2', name: 'ஃபில்டர் காபி', qty: 1, price: 30, total: 30 }
 ];
 
 export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
@@ -39,9 +39,9 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
   const logoOffsetX = Math.max(-85, Math.min(85, Number(settings.logoOffsetX || 0)));
   const logoOffsetY = Math.max(-16, Math.min(36, Number(settings.logoOffsetY || 0)));
 
-  const baseFontSize = Math.max(10, Math.min(14, Number(settings.receiptFontSize || 12)));
-  const titleFontSize = Math.round(baseFontSize * 1.25 * 10) / 10;
-  const totalFontSize = Math.round(baseFontSize * 1.2 * 10) / 10;
+  const baseFontSize = Math.max(10, Math.min(14, Number(settings.receiptFontSize || 12))) + 1.5;
+  const titleFontSize = Math.round(baseFontSize * 1.3 * 10) / 10;
+  const totalFontSize = Math.round(baseFontSize * 1.25 * 10) / 10;
 
   // Alignments
   const defaultAlign = settings.receiptAlignment || 'center';
@@ -158,25 +158,32 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
           }}
           className="relative bg-white text-black w-[296px] px-3 py-3.5 shadow-2xl border border-slate-300 font-mono select-none overflow-hidden"
         >
-          {/* Centered Watermark Behind Receipt Content */}
+          {/* Centered Watermark Behind Receipt Content (Watermark Alone - Draggable) */}
           {watermarkEnabled && (
             <div
               data-testid="receipt-watermark"
-              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 overflow-hidden"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              style={{ touchAction: 'none' }}
+              className="absolute inset-0 flex items-center justify-center select-none z-0 overflow-hidden cursor-grab active:cursor-grabbing"
+              title="Drag watermark to adjust position"
             >
               <div
                 className="flex items-center justify-center text-center"
                 style={{
-                  width: '145px',
-                  height: '145px',
-                  opacity: watermarkOpacity
+                  width: '155px',
+                  height: '155px',
+                  opacity: watermarkOpacity,
+                  transform: `translate(${logoOffsetX}px, ${logoOffsetY}px)`
                 }}
               >
                 {watermarkUseLogo && displayLogo ? (
                   <img
                     src={displayLogo}
                     alt="Receipt Watermark"
-                    className="max-w-full max-h-full object-contain grayscale"
+                    className="max-w-full max-h-full object-contain grayscale pointer-events-none select-none"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
@@ -189,83 +196,32 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
           )}
 
           {/* Receipt Foreground Content Layer */}
-          <div className="relative z-10">
-            {/* Draggable Shop Logo Area */}
-            {!isLogoRemoved && displayLogo && (
-              <div
-                style={{ textAlign: logoAlign }}
-                className="relative w-full min-h-[58px] py-1 mb-1 overflow-hidden border border-dashed border-transparent hover:border-amber-400/70 rounded transition-colors"
-              >
-                <div
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  style={{
-                    transform: `translate(${logoOffsetX}px, ${logoOffsetY}px)`,
-                    touchAction: 'none'
-                  }}
-                  title="Drag logo horizontally or vertically to adjust position"
-                  className={`inline-block cursor-grab active:cursor-grabbing relative group ${
-                    isDragging ? 'ring-2 ring-amber-500 rounded bg-amber-50/30' : ''
-                  }`}
-                >
-                  <img
-                    src={displayLogo}
-                    alt="Shop Logo"
-                    style={{
-                      maxWidth: `${Math.min(170, settings.receiptLogoMaxWidth || 95)}px`,
-                      maxHeight: `${Math.min(75, settings.receiptLogoMaxHeight || 65)}px`
-                    }}
-                    className="w-auto h-auto object-contain pointer-events-none select-none block"
-                    referrerPolicy="no-referrer"
-                  />
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-1 -right-1 bg-slate-900 text-amber-300 text-[9px] px-1 py-0.5 rounded flex items-center gap-0.5 shadow">
-                    <Move className="w-2.5 h-2.5" />
-                    Drag
-                  </span>
-                </div>
-              </div>
-            )}
-
+          <div className="relative z-10 pointer-events-none">
             {/* 1. Shop Name, Address, Phone */}
-            <div className="mb-1.5 space-y-0.5">
-              {settings.restaurantNameTamil && (
-                <div
-                  style={{
-                    fontSize: `${titleFontSize}px`,
-                    textAlign: shopNameAlign,
-                    fontWeight: boldRestaurantName ? 800 : 400
-                  }}
-                  className="text-black leading-tight font-sans"
-                >
-                  {settings.restaurantNameTamil}
-                </div>
-              )}
-
+            <div className="mb-1">
               <div
                 style={{
-                  fontSize: `${Math.round(titleFontSize * 0.92)}px`,
+                  fontSize: `${titleFontSize}px`,
                   textAlign: shopNameAlign,
                   fontWeight: boldRestaurantName ? 800 : 400
                 }}
-                className="text-black leading-tight uppercase"
+                className="text-black leading-tight font-sans mb-0.5"
               >
-                {settings.restaurantName || 'SRI SARAVANA BHAVAN'}
+                {settings.restaurantNameTamil || settings.restaurantName || 'ஸ்ரீ சரவண பவன்'}
               </div>
 
               <div
-                style={{ textAlign: addressAlign }}
-                className="text-black leading-snug"
+                style={{ textAlign: addressAlign, lineHeight: '1.02' }}
+                className="text-black"
               >
                 {addressLines.map((line, idx) => (
-                  <div key={idx}>{line}</div>
+                  <div key={idx} className="leading-[1.02] m-0 p-0">{line}</div>
                 ))}
               </div>
 
               <div
-                style={{ textAlign: phoneAlign }}
-                className="text-black leading-snug"
+                style={{ textAlign: phoneAlign, lineHeight: '1.05' }}
+                className="text-black mt-0.5"
               >
                 PH: {settings.phone || '7708159933'}
               </div>
@@ -276,11 +232,14 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
               style={{ textAlign: billHeaderAlign }}
               className="py-1.5 my-1 border-y border-dashed border-black space-y-0.5"
             >
-              <div style={{ fontWeight: boldBillNumber ? 800 : 400 }}>
-                Bill No: 015
+              <div className="flex justify-between items-center" style={{ fontWeight: boldBillNumber ? 800 : 400 }}>
+                <span>Bill No: 015</span>
+                <span>Time: {formattedTime}</span>
               </div>
-              <div>Date: {formattedDate}</div>
-              <div>Time: {formattedTime}</div>
+              <div className="flex justify-between items-center">
+                <span>Order: Dine-In</span>
+                <span>Captain: 01</span>
+              </div>
             </div>
 
             {/* 3. Items Table */}
@@ -318,7 +277,7 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
                 className="flex justify-between items-center text-black"
               >
                 <span>Grand Total:</span>
-                <span>400</span>
+                <span>₹190</span>
               </div>
             </div>
 

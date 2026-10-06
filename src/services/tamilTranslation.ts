@@ -3,8 +3,11 @@
  * Ensures all food item names on thermal receipts and receipt previews 
  * render in Tamil script while reports and back-office remain in English.
  */
+import { DEFAULT_FALLBACK_MENU_ITEMS } from '../data/fallbackMenu';
 
 export const TAMIL_MENU_DICTIONARY: Record<string, string> = {
+  'rice': 'சாதம்',
+  'juice': 'ஜூஸ்',
   // --- Tiffin & Breakfast ---
   'idly': 'இட்லி',
   'idli': 'இட்லி',
@@ -343,8 +346,15 @@ function normalizeName(str: string): string {
  * Otherwise, performs dictionary lookup or intelligent token translation.
  */
 export function getTamilItemName(itemName: string, customTamilName?: string): string {
-  if (customTamilName && customTamilName.trim().length > 0) {
-    return customTamilName.trim();
+  const cleanCustom = customTamilName?.trim() || '';
+  const cleanEnglish = (itemName || '').trim();
+
+  // If customTamilName is provided and either contains Tamil characters or differs from the English name, use it
+  if (
+    cleanCustom.length > 0 &&
+    (/[\u0B80-\u0BFF]/.test(cleanCustom) || cleanCustom.toLowerCase() !== cleanEnglish.toLowerCase())
+  ) {
+    return cleanCustom;
   }
 
   if (!itemName || typeof itemName !== 'string') {
@@ -353,6 +363,40 @@ export function getTamilItemName(itemName: string, customTamilName?: string): st
 
   const raw = itemName.trim();
   const normalized = normalizeName(raw);
+  if (!normalized) {
+    return '';
+  }
+
+  // 0. Check local Menu Management items if available in localStorage
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const storedMenu = localStorage.getItem('pos_local_menu_items');
+      if (storedMenu) {
+        const parsed = JSON.parse(storedMenu);
+        if (Array.isArray(parsed)) {
+          const matchedLocal = parsed.find(
+            (m: any) =>
+              m &&
+              ((m.itemName && normalizeName(String(m.itemName)) === normalized) ||
+                (m.itemNameEnglish && normalizeName(String(m.itemNameEnglish)) === normalized)) &&
+              m.itemNameTamil &&
+              /[\u0B80-\u0BFF]/.test(String(m.itemNameTamil))
+          );
+          if (matchedLocal) {
+            return String(matchedLocal.itemNameTamil).trim();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 0b. Check DEFAULT_FALLBACK_MENU_ITEMS catalog
+  const matchedFallback = DEFAULT_FALLBACK_MENU_ITEMS.find(
+    (m) => normalizeName(m.itemName) === normalized && m.itemNameTamil
+  );
+  if (matchedFallback && matchedFallback.itemNameTamil) {
+    return matchedFallback.itemNameTamil.trim();
+  }
 
   // 1. Direct dictionary match
   if (TAMIL_MENU_DICTIONARY[normalized]) {

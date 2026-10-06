@@ -185,7 +185,7 @@ describe('DailySnapshot Component', () => {
     // Filter Coffee has 3 sold
     expect(screen.getByText('Top-Selling Item')).toBeDefined();
     expect(screen.getByText('Ghee Roast')).toBeDefined();
-    expect(screen.getByText('(நெய் ரோஸ்ட்)')).toBeDefined();
+    expect(screen.queryByText('(நெய் ரோஸ்ட்)')).toBeNull();
     expect(screen.getByText('6 sold')).toBeDefined();
     expect(screen.getByText('₹640')).toBeDefined();
 

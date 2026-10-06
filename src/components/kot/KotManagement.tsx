@@ -283,7 +283,6 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         !q || 
         item.itemCode.toLowerCase().includes(q) || 
         item.itemName.toLowerCase().includes(q) ||
-        (item.itemNameTamil && item.itemNameTamil.toLowerCase().includes(q)) ||
         (item.categoryName && item.categoryName.toLowerCase().includes(q));
       return matchesCat && matchesSearch;
     });
@@ -942,7 +941,6 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs shrink-0 font-medium"
                   >
                     <span className="text-white font-bold">{item.name}</span>
-                    {item.tamil && <span className="text-slate-400 text-[10px]">({item.tamil})</span>}
                     <span className="bg-amber-500/20 text-amber-300 font-mono font-black px-1.5 py-0.2 rounded text-xs border border-amber-500/30">
                       ×{item.qty}
                     </span>
@@ -1173,11 +1171,6 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                               <div className="font-bold text-slate-100 text-sm sm:text-[13px] leading-snug break-words">
                                 {idx + 1}. {itm.itemName}
                               </div>
-                              {itm.itemNameTamil && (
-                                <div className="text-xs sm:text-[11px] text-amber-200/90 font-sans mt-0.5 font-normal">
-                                  {itm.itemNameTamil}
-                                </div>
-                              )}
                               {itm.notes && (
                                 <span className="inline-flex items-center gap-1 text-xs sm:text-[11px] text-amber-300 font-sans bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded mt-1 font-medium">
                                   <span>⚡</span>
@@ -1466,11 +1459,6 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                       <h4 className="font-bold text-xs sm:text-[13px] text-slate-100 mt-1 line-clamp-1 sm:line-clamp-2 leading-tight group-hover:text-amber-200">
                         {item.itemName}
                       </h4>
-                      {item.itemNameTamil && (
-                        <p className="text-[10px] text-slate-400 truncate leading-tight font-sans">
-                          {item.itemNameTamil}
-                        </p>
-                      )}
                     </div>
 
                     <div className="mt-1.5 flex items-center justify-between pt-1 border-t border-slate-900/80 gap-1">

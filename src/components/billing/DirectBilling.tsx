@@ -1667,11 +1667,6 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                       <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                         {selectedMenuItem.itemName}
                       </span>
-                      {selectedMenuItem.itemNameTamil && (
-                        <span className="text-xs text-emerald-800 truncate hidden xs:inline">
-                          ({selectedMenuItem.itemNameTamil})
-                        </span>
-                      )}
                     </div>
                     <div className="text-right shrink-0 font-mono pl-2.5 border-l border-emerald-200 flex items-center gap-1">
                       <span className="text-sm sm:text-base font-black text-emerald-800">
