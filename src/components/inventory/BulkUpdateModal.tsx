@@ -13,13 +13,26 @@ import {
   Sliders, 
   ArrowRight, 
   Plus, 
-  RotateCcw,
-  Sparkles,
-  Table,
-  Check,
-  Package,
-  Layers
+  RotateCcw, 
+  Sparkles, 
+  Table, 
+  Check, 
+  Package, 
+  Layers,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  FileUp,
+  AlertCircle,
+  FileCheck,
+  Search,
+  Trash2,
+  Edit2,
+  Info,
+  RefreshCw,
+  FileText
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { writeBatch, doc } from 'firebase/firestore';
 import { db, sanitizeForFirestore } from '../../services/firebase';
 import { InventoryItem, MenuItem, StockMovement, CountPurchaseRecord } from '../../types';
@@ -44,13 +57,31 @@ export interface BulkItemRow {
   acPrice: number;
 }
 
+export interface ParsedTemplateRow {
+  rowNumber: number;
+  itemCode: string;
+  itemName: string;
+  currentStock: number;
+  newStock: number;
+  delta: number;
+  minStock: number;
+  notes: string;
+  matchedItemId?: string;
+  category?: string;
+  unit: string;
+  isInitialized: boolean;
+  status: 'VALID' | 'UNMATCHED' | 'INVALID_STOCK';
+  errorMessage?: string;
+}
+
 interface BulkUpdateModalProps {
   isOpen: boolean;
   selectedItems: BulkItemRow[];
-  initialTab?: 'PRICE' | 'STOCK' | 'MATRIX';
+  initialTab?: 'PRICE' | 'STOCK' | 'MATRIX' | 'TEMPLATE';
   onClose: () => void;
   onApplySuccess: (summaryMessage: string) => void;
   currentUserName: string;
+  allItems?: BulkItemRow[];
 }
 
 export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
@@ -59,9 +90,10 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   initialTab = 'PRICE',
   onClose,
   onApplySuccess,
-  currentUserName
+  currentUserName,
+  allItems
 }) => {
-  const [activeTab, setActiveTab] = useState<'PRICE' | 'STOCK' | 'MATRIX'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'PRICE' | 'STOCK' | 'MATRIX' | 'TEMPLATE'>(initialTab);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -329,8 +361,365 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   };
 
   // =========================================================================
+  // TAB 4: BULK EXCEL/CSV TEMPLATE STATE & HANDLERS
+  // =========================================================================
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedRows, setUploadedRows] = useState<ParsedTemplateRow[]>([]);
+  const [templateFilter, setTemplateFilter] = useState<'ALL' | 'VALID' | 'ERRORS'>('ALL');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+
+  // 1. Download formatted Excel template
+  const handleDownloadTemplate = (mode: 'CATALOG_ITEMS' | 'BLANK' = 'CATALOG_ITEMS') => {
+    try {
+      const sourceList = mode === 'BLANK'
+        ? []
+        : (allItems && allItems.length > 0 ? allItems : selectedItems);
+
+      const rows = sourceList.length > 0
+        ? sourceList.map((item) => ({
+            'Item Code': item.itemCode,
+            'Item Name': item.itemName,
+            'Category': item.category || 'General',
+            'Unit': item.unit || 'Pcs',
+            'Current Stock': item.remainingCount !== undefined ? item.remainingCount : item.currentStock,
+            'New Stock Level': item.remainingCount !== undefined ? item.remainingCount : item.currentStock,
+            'Minimum Stock Level': item.minimumStock || 10,
+            'Notes / Adjustment Reason': 'Physical inventory count'
+          }))
+        : [
+            {
+              'Item Code': 'IC01',
+              'Item Name': 'Vanilla Cup',
+              'Category': 'Ice Cream',
+              'Unit': 'Pcs',
+              'Current Stock': 50,
+              'New Stock Level': 65,
+              'Minimum Stock Level': 15,
+              'Notes / Adjustment Reason': 'Weekly inventory recount'
+            },
+            {
+              'Item Code': 'CD01',
+              'Item Name': 'Cola 500ml',
+              'Category': 'Cool Drinks',
+              'Unit': 'Bottle',
+              'Current Stock': 30,
+              'New Stock Level': 25,
+              'Minimum Stock Level': 10,
+              'Notes / Adjustment Reason': 'Supplier delivery verification'
+            }
+          ];
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock_Update');
+
+      worksheet['!cols'] = [
+        { wch: 14 },
+        { wch: 30 },
+        { wch: 18 },
+        { wch: 10 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 32 }
+      ];
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `inventory_bulk_stock_template_${dateStr}.xlsx`);
+    } catch (err: any) {
+      setErrorMessage(`Failed to generate template: ${err?.message || 'Error creating spreadsheet'}`);
+    }
+  };
+
+  // 2. Parse uploaded file (.xlsx, .xls, .csv)
+  const parseSpreadsheetFile = (file: File) => {
+    setErrorMessage(null);
+    const pool = allItems && allItems.length > 0 ? allItems : selectedItems;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          setErrorMessage('The uploaded file does not contain any readable sheets.');
+          return;
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (!rawJson || rawJson.length === 0) {
+          setErrorMessage('The uploaded template is empty. Please enter data into rows.');
+          return;
+        }
+
+        const parsed: ParsedTemplateRow[] = rawJson.map((row, idx) => {
+          const rawCode = String(
+            row['Item Code'] ||
+            row['ItemCode'] ||
+            row['Item code'] ||
+            row['itemCode'] ||
+            row['Code'] ||
+            row['code'] ||
+            row['ITEM CODE'] ||
+            ''
+          ).trim();
+
+          const rawName = String(
+            row['Item Name'] ||
+            row['ItemName'] ||
+            row['Item name'] ||
+            row['itemName'] ||
+            row['Name'] ||
+            row['name'] ||
+            ''
+          ).trim();
+
+          const rawNewStock =
+            row['New Stock Level'] !== '' && row['New Stock Level'] !== undefined
+              ? row['New Stock Level']
+              : row['New Stock'] !== '' && row['New Stock'] !== undefined
+              ? row['New Stock']
+              : row['NewStock'] !== '' && row['NewStock'] !== undefined
+              ? row['NewStock']
+              : row['Stock'] !== '' && row['Stock'] !== undefined
+              ? row['Stock']
+              : row['Quantity'] !== '' && row['Quantity'] !== undefined
+              ? row['Quantity']
+              : row['Qty'];
+
+          const rawMinStock =
+            row['Minimum Stock Level'] !== '' && row['Minimum Stock Level'] !== undefined
+              ? row['Minimum Stock Level']
+              : row['Minimum Stock'] !== '' && row['Minimum Stock'] !== undefined
+              ? row['Minimum Stock']
+              : row['Min Stock'] !== '' && row['Min Stock'] !== undefined
+              ? row['Min Stock']
+              : row['Min'];
+
+          const rawNotes = String(
+            row['Notes / Adjustment Reason'] ||
+            row['Adjustment Reason / Notes'] ||
+            row['Notes'] ||
+            row['Reason'] ||
+            row['Adjustment Reason'] ||
+            'Template stock adjustment'
+          ).trim();
+
+          // Match against catalog
+          let matched: BulkItemRow | undefined = undefined;
+          if (rawCode) {
+            matched = pool.find((i) => i.itemCode && i.itemCode.trim().toUpperCase() === rawCode.toUpperCase());
+          }
+          if (!matched && rawName) {
+            matched = pool.find((i) => i.itemName && i.itemName.trim().toLowerCase() === rawName.toLowerCase());
+          }
+
+          const currentStock = matched
+            ? (matched.remainingCount !== undefined ? matched.remainingCount : matched.currentStock)
+            : 0;
+
+          const numNewStock = parseFloat(String(rawNewStock));
+          const numMinStock = parseFloat(String(rawMinStock));
+
+          let status: 'VALID' | 'UNMATCHED' | 'INVALID_STOCK' = 'VALID';
+          let errorMsg: string | undefined = undefined;
+
+          if (!matched) {
+            status = 'UNMATCHED';
+            errorMsg = `Code "${rawCode || rawName || 'Row ' + (idx + 2)}" not found in catalog`;
+          } else if (rawNewStock === '' || rawNewStock === undefined || isNaN(numNewStock) || numNewStock < 0) {
+            status = 'INVALID_STOCK';
+            errorMsg = `Invalid stock quantity: "${rawNewStock}"`;
+          }
+
+          const safeNewStock = isNaN(numNewStock) || numNewStock < 0 ? currentStock : numNewStock;
+          const safeMinStock = isNaN(numMinStock) || numMinStock < 0 ? (matched?.minimumStock || 10) : numMinStock;
+
+          return {
+            rowNumber: idx + 2,
+            itemCode: matched?.itemCode || rawCode || 'UNKNOWN',
+            itemName: matched?.itemName || rawName || 'Unmatched Item',
+            currentStock,
+            newStock: safeNewStock,
+            delta: safeNewStock - currentStock,
+            minStock: safeMinStock,
+            notes: rawNotes,
+            matchedItemId: matched?.id,
+            category: matched?.category || 'Other',
+            unit: matched?.unit || 'Pcs',
+            isInitialized: !!matched?.isInitialized,
+            status,
+            errorMessage: errorMsg
+          };
+        });
+
+        setUploadedRows(parsed);
+        setUploadedFileName(file.name);
+      } catch (err: any) {
+        setErrorMessage(`Failed to read file: ${err?.message || 'Invalid spreadsheet file'}`);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleUpdateParsedRow = (index: number, newStockVal: string, minStockVal?: string) => {
+    setUploadedRows((prev) => {
+      const copy = [...prev];
+      const target = copy[index];
+      if (!target) return prev;
+
+      const numStock = parseFloat(newStockVal);
+      if (!isNaN(numStock) && numStock >= 0) {
+        target.newStock = numStock;
+        target.delta = numStock - target.currentStock;
+        if (target.status === 'INVALID_STOCK') {
+          target.status = target.matchedItemId ? 'VALID' : 'UNMATCHED';
+          target.errorMessage = target.matchedItemId ? undefined : target.errorMessage;
+        }
+      }
+      if (minStockVal !== undefined) {
+        const numMin = parseFloat(minStockVal);
+        if (!isNaN(numMin) && numMin >= 0) {
+          target.minStock = numMin;
+        }
+      }
+      return copy;
+    });
+  };
+
+  const handleDeleteParsedRow = (index: number) => {
+    setUploadedRows((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Filtered rows for template preview
+  const displayedTemplateRows = useMemo(() => {
+    let rows = uploadedRows;
+    if (templateFilter === 'VALID') {
+      rows = rows.filter((r) => r.status === 'VALID');
+    } else if (templateFilter === 'ERRORS') {
+      rows = rows.filter((r) => r.status !== 'VALID');
+    }
+
+    if (templateSearchQuery.trim()) {
+      const q = templateSearchQuery.trim().toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.itemCode.toLowerCase().includes(q) ||
+          r.itemName.toLowerCase().includes(q) ||
+          (r.category && r.category.toLowerCase().includes(q))
+      );
+    }
+    return rows;
+  }, [uploadedRows, templateFilter, templateSearchQuery]);
+
+  // =========================================================================
   // COMMIT HANDLERS
   // =========================================================================
+
+  // 4. SAVE TEMPLATE STOCK UPDATES
+  const handleSaveTemplateUpdates = async () => {
+    const validRows = uploadedRows.filter((r) => r.status === 'VALID' && r.matchedItemId);
+    if (validRows.length === 0) {
+      setErrorMessage('No valid items to update. Please review errors or upload a valid template.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage(null);
+
+    try {
+      let localInventory: InventoryItem[] = [];
+      try {
+        const stored = localStorage.getItem('pos_local_inventory');
+        if (stored) localInventory = JSON.parse(stored);
+      } catch (e) {}
+
+      const batch = writeBatch(db);
+      const now = Date.now();
+
+      validRows.forEach((row) => {
+        const itemId = row.matchedItemId!;
+        const existing = localInventory.find((i) => i.id === itemId);
+
+        const initialStock = row.isInitialized ? (existing?.initialStock || 0) : row.newStock;
+        const isInitialized = true;
+        const purchasedCount = existing?.purchasedCount || 0;
+        const soldCount = existing?.soldCount || 0;
+        const missingCount = existing?.missingCount || 0;
+        const remainingCount = row.newStock;
+        const minimumStock = row.minStock;
+        const purchases: CountPurchaseRecord[] = existing?.purchases ? [...existing.purchases] : [];
+
+        // Create an inventory movement audit record for this template adjustment
+        const movId = `mov_tmpl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const movRef = doc(db, 'inventory_movements', movId);
+        batch.set(movRef, sanitizeForFirestore({
+          itemId,
+          itemCode: row.itemCode,
+          itemName: row.itemName,
+          type: 'ADJUSTMENT',
+          quantity: row.newStock,
+          delta: row.delta,
+          createdBy: currentUserName || 'Manager',
+          createdAt: now,
+          notes: `Template upload: ${row.notes || 'Bulk stock adjust'}`
+        }));
+
+        const updatedItem: InventoryItem = {
+          id: itemId,
+          itemCode: row.itemCode,
+          itemName: row.itemName,
+          category: row.category || 'Other',
+          unit: row.unit || 'Pcs',
+          minimumStock,
+          currentStock: remainingCount,
+          remainingCount,
+          active: true,
+          isCountBased: true,
+          isInitialized,
+          initialStock,
+          purchasedCount,
+          soldCount,
+          missingCount,
+          purchases,
+          createdAt: existing?.createdAt || now,
+          updatedAt: now
+        };
+
+        const idx = localInventory.findIndex((i) => i.id === itemId);
+        if (idx >= 0) {
+          localInventory[idx] = updatedItem;
+        } else {
+          localInventory.push(updatedItem);
+        }
+
+        const ref = doc(db, 'inventory_items', itemId);
+        batch.set(ref, sanitizeForFirestore(updatedItem), { merge: true });
+      });
+
+      localStorage.setItem('pos_local_inventory', JSON.stringify(localInventory));
+
+      try {
+        await batch.commit();
+      } catch (fbErr: any) {
+        console.warn('Firestore template batch commit notice:', fbErr?.message || fbErr);
+      }
+
+      window.dispatchEvent(new Event('pos_inventory_updated'));
+
+      onApplySuccess(`Successfully updated stock for ${validRows.length} items from template.`);
+      onClose();
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to apply template updates.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // 1. SAVE BULK PRICE UPDATES
   const handleSaveBulkPrices = async () => {
@@ -668,7 +1057,7 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between shadow-md shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-sm font-black">
-              {activeTab === 'PRICE' ? <DollarSign className="w-6 h-6" /> : activeTab === 'STOCK' ? <Boxes className="w-6 h-6" /> : <Table className="w-6 h-6" />}
+              {activeTab === 'PRICE' ? <DollarSign className="w-6 h-6" /> : activeTab === 'STOCK' ? <Boxes className="w-6 h-6" /> : activeTab === 'TEMPLATE' ? <FileSpreadsheet className="w-6 h-6" /> : <Table className="w-6 h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -676,7 +1065,7 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                   Bulk Operations Manager
                 </h2>
                 <span className="bg-amber-400 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-2xs">
-                  {selectedItems.length} {selectedItems.length === 1 ? 'Item' : 'Items'} Selected
+                  {activeTab === 'TEMPLATE' && uploadedRows.length > 0 ? `${uploadedRows.length} Rows Uploaded` : `${selectedItems.length} ${selectedItems.length === 1 ? 'Item' : 'Items'} Selected`}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -696,6 +1085,19 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 
         {/* TAB SWITCHER */}
         <div className="bg-slate-100 border-b border-slate-200 px-5 pt-2 flex items-center gap-2 overflow-x-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('TEMPLATE')}
+            className={`px-4 py-2.5 text-xs font-black rounded-t-xl flex items-center gap-2 transition-all cursor-pointer border-t border-x ${
+              activeTab === 'TEMPLATE'
+                ? 'bg-white text-indigo-900 border-slate-200 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 border-transparent hover:bg-slate-200/60'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <span>UPLOAD EXCEL TEMPLATE</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('PRICE')}
@@ -1558,6 +1960,363 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* TAB 4: BULK EXCEL / CSV TEMPLATE UPLOAD & SYNC                            */}
+          {/* ========================================================================= */}
+          {activeTab === 'TEMPLATE' && (
+            <div className="space-y-5">
+              
+              {/* Step 1 & 2 Instructions Banner */}
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200/80 rounded-2xl p-4 sm:p-5">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black text-indigo-950 uppercase tracking-wide">
+                      Bulk Stock Update via Spreadsheet Template
+                    </h3>
+                    <p className="text-xs text-indigo-800 leading-relaxed">
+                      Download the pre-formatted Excel template prefilled with your catalog dishes. Update the <strong className="font-black text-indigo-950">"New Stock Level"</strong> column (and optional Minimum Stock / Notes), then upload it below to adjust stock across all items in one operation.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-3 border-t border-indigo-200/60">
+                  <div className="bg-white/80 border border-indigo-100 rounded-xl p-3 flex items-start gap-2.5">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-black flex items-center justify-center shrink-0">1</span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Download Template</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Pre-filled with all dishes and current stock counts.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 border border-indigo-100 rounded-xl p-3 flex items-start gap-2.5">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-black flex items-center justify-center shrink-0">2</span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Fill in New Stock</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Edit in Excel or Google Sheets and save.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 border border-indigo-100 rounded-xl p-3 flex items-start gap-2.5">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-800 text-xs font-black flex items-center justify-center shrink-0">3</span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Upload & Apply</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Preview changes, resolve errors, and save.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Bar: Download Template Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 uppercase">Step 1: Get the Template File</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Choose between all catalog items or a blank format</p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadTemplate('CATALOG_ITEMS')}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Pre-filled Template (.xlsx)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadTemplate('BLANK')}
+                    className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl shadow-2xs flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-slate-500" />
+                    <span>Blank Sample (.xlsx)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Upload Drop Zone */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">
+                  Step 2: Upload Completed Spreadsheet (.xlsx, .xls, .csv)
+                </label>
+
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFile(true);
+                  }}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFile(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) parseSpreadsheetFile(file);
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center transition-all cursor-pointer relative ${
+                    isDraggingFile
+                      ? 'border-indigo-500 bg-indigo-50/80 ring-4 ring-indigo-500/20'
+                      : uploadedFileName
+                      ? 'border-emerald-300 bg-emerald-50/40'
+                      : 'border-slate-300 hover:border-indigo-400 bg-white hover:bg-slate-50/60'
+                  }`}
+                  onClick={() => document.getElementById('template-file-input')?.click()}
+                >
+                  <input
+                    id="template-file-input"
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) parseSpreadsheetFile(file);
+                      e.target.value = '';
+                    }}
+                  />
+
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xs ${
+                      uploadedFileName ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-600'
+                    }`}>
+                      {uploadedFileName ? <FileCheck className="w-6 h-6" /> : <FileUp className="w-6 h-6" />}
+                    </div>
+
+                    {uploadedFileName ? (
+                      <div>
+                        <div className="flex items-center justify-center gap-2">
+                          <p className="text-sm font-black text-slate-900">{uploadedFileName}</p>
+                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                            {uploadedRows.length} {uploadedRows.length === 1 ? 'Row' : 'Rows'} Loaded
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Click or drag a new file to replace this template
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">
+                          Click to browse or drag & drop template file here
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Supports Microsoft Excel (.xlsx, .xls) and Comma-Separated Values (.csv)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Uploaded Preview Section */}
+              {uploadedRows.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase block">Total Items in File</span>
+                      <span className="text-lg font-black text-slate-900 mt-0.5 block">{uploadedRows.length}</span>
+                    </div>
+
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                      <span className="text-[11px] font-bold text-emerald-700 uppercase block">Matched & Valid</span>
+                      <span className="text-lg font-black text-emerald-800 mt-0.5 block">
+                        {uploadedRows.filter((r) => r.status === 'VALID').length}
+                      </span>
+                    </div>
+
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <span className="text-[11px] font-bold text-red-700 uppercase block">Unmatched / Errors</span>
+                      <span className="text-lg font-black text-red-800 mt-0.5 block">
+                        {uploadedRows.filter((r) => r.status !== 'VALID').length}
+                      </span>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                      <span className="text-[11px] font-bold text-blue-700 uppercase block">Total Net Delta</span>
+                      <span className="text-lg font-black text-blue-800 mt-0.5 block">
+                        {(() => {
+                          const net = uploadedRows
+                            .filter((r) => r.status === 'VALID')
+                            .reduce((sum, r) => sum + r.delta, 0);
+                          return net >= 0 ? `+${net}` : `${net}`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Filter and Search Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white border border-slate-200 rounded-xl p-2.5">
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                      {(['ALL', 'VALID', 'ERRORS'] as const).map((filter) => {
+                        const count =
+                          filter === 'ALL'
+                            ? uploadedRows.length
+                            : filter === 'VALID'
+                            ? uploadedRows.filter((r) => r.status === 'VALID').length
+                            : uploadedRows.filter((r) => r.status !== 'VALID').length;
+
+                        return (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setTemplateFilter(filter)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                              templateFilter === filter
+                                ? 'bg-slate-900 text-white shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <span>{filter === 'ALL' ? 'All' : filter === 'VALID' ? 'Valid Ready' : 'Errors'}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                              templateFilter === filter ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={templateSearchQuery}
+                        onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                        placeholder="Search uploaded items..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Template Preview Table */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
+                    <div className="max-h-72 overflow-y-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-3">Item Code & Name</th>
+                            <th className="py-2.5 px-3 text-center">Previous Stock</th>
+                            <th className="py-2.5 px-3 text-center">New Stock (Editable)</th>
+                            <th className="py-2.5 px-3 text-center">Net Change</th>
+                            <th className="py-2.5 px-3">Notes / Reason</th>
+                            <th className="py-2.5 px-3 text-center">Match Status</th>
+                            <th className="py-2.5 px-3 text-center">Action</th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100">
+                          {displayedTemplateRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-xs text-slate-400 font-medium">
+                                No items matching current filter or search query.
+                              </td>
+                            </tr>
+                          ) : (
+                            displayedTemplateRows.map((row) => {
+                              const originalIdx = uploadedRows.findIndex((r) => r.rowNumber === row.rowNumber);
+
+                              return (
+                                <tr
+                                  key={row.rowNumber}
+                                  className={`hover:bg-slate-50/80 transition-colors ${
+                                    row.status === 'UNMATCHED' ? 'bg-red-50/30' : row.status === 'INVALID_STOCK' ? 'bg-amber-50/30' : ''
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold">
+                                        #{row.itemCode}
+                                      </span>
+                                      <div>
+                                        <p className="font-bold text-slate-900 leading-tight">{row.itemName}</p>
+                                        <p className="text-[10px] text-slate-400">{row.category} • {row.unit}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-2 px-3 text-center font-mono font-bold text-slate-600">
+                                    {row.currentStock}
+                                  </td>
+
+                                  <td className="py-2 px-3 text-center">
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      value={row.newStock}
+                                      onChange={(e) => handleUpdateParsedRow(originalIdx, e.target.value)}
+                                      className={`w-24 text-center font-mono font-bold text-slate-900 border rounded-lg py-1 px-2 focus:outline-none ${
+                                        row.status === 'VALID'
+                                          ? 'bg-slate-50 border-slate-200 focus:border-indigo-500 focus:bg-white'
+                                          : 'bg-red-50 border-red-300 focus:border-red-500'
+                                      }`}
+                                    />
+                                  </td>
+
+                                  <td className="py-2 px-3 text-center">
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded-full font-mono text-[11px] font-black ${
+                                        row.delta > 0
+                                          ? 'bg-emerald-100 text-emerald-800'
+                                          : row.delta < 0
+                                          ? 'bg-red-100 text-red-800'
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}
+                                    >
+                                      {row.delta > 0 ? `+${row.delta}` : `${row.delta}`}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-2 px-3 text-slate-600 text-[11px] max-w-xs truncate" title={row.notes}>
+                                    {row.notes || '—'}
+                                  </td>
+
+                                  <td className="py-2 px-3 text-center">
+                                    {row.status === 'VALID' ? (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                                        <Check className="w-3 h-3 stroke-[3]" /> Ready
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="inline-flex items-center gap-1 text-[10px] font-black text-red-800 bg-red-100 px-2 py-0.5 rounded-full"
+                                        title={row.errorMessage}
+                                      >
+                                        <AlertTriangle className="w-3 h-3 shrink-0" />
+                                        {row.status === 'UNMATCHED' ? 'Not Found' : 'Invalid Qty'}
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteParsedRow(originalIdx)}
+                                      className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                      title="Remove from update"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
         </div>
 
         {/* MODAL FOOTER */}
@@ -1575,6 +2334,29 @@ export const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             >
               Cancel
             </button>
+
+            {activeTab === 'TEMPLATE' && (
+              <button
+                type="button"
+                onClick={handleSaveTemplateUpdates}
+                disabled={saving || uploadedRows.filter((r) => r.status === 'VALID').length === 0}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Applying Template...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>
+                      APPLY TEMPLATE STOCK ({uploadedRows.filter((r) => r.status === 'VALID').length})
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
 
             {activeTab === 'PRICE' && (
               <button

@@ -2,20 +2,25 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
   initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager,
+  enableIndexedDbPersistence,
   enableNetwork,
-  disableNetwork
+  disableNetwork,
+  setLogLevel
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { safeStorage } from '../utils/safeStorage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Silence benign WebChannel transport reconnection warnings (stream dropped by proxies/iframes)
+try {
+  setLogLevel('error');
+} catch (_) {}
+
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with robust multi-tab offline persistence
+// Initialize Firestore with long-polling for proxy stability
 let db: ReturnType<typeof getFirestore>;
 
 const databaseId = (firebaseConfig as any).firestoreDatabaseId || undefined;
@@ -24,15 +29,30 @@ try {
   db = initializeFirestore(
     app,
     {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
+      experimentalForceLongPolling: true,
     },
     databaseId
   );
 } catch (e) {
   // If already initialized, get instance with specified databaseId
   db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+}
+
+// Enable IndexedDb persistence with forceOwnership: true for resilient local state synchronization
+if (typeof window !== 'undefined' && db) {
+  try {
+    enableIndexedDbPersistence(db, { forceOwnership: true }).catch((err) => {
+      if (err?.code === 'failed-precondition') {
+        console.warn('Firestore persistence notice: Another tab is active with cache ownership');
+      } else if (err?.code === 'unimplemented') {
+        console.warn('Firestore persistence not supported in this browser environment');
+      } else {
+        console.warn('Firestore persistence initialization notice:', err?.message || err);
+      }
+    });
+  } catch (err: any) {
+    console.warn('Firestore persistence synchronous initialization notice:', err?.message || err);
+  }
 }
 
 export const auth = getAuth(app);

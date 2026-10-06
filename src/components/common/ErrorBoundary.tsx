@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { Component } from 'react';
+import * as Sentry from '@sentry/react';
 import { AlertTriangle, RotateCcw, Trash2 } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 
@@ -20,6 +21,14 @@ export class ErrorBoundary extends Component {
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught error caught by ErrorBoundary:', error, errorInfo);
     this.setState({ errorInfo });
+    try {
+      Sentry.captureException(error, {
+        extra: {
+          componentStack: errorInfo?.componentStack,
+          ...errorInfo,
+        },
+      });
+    } catch (_) {}
   }
 
   handleReload = () => {

@@ -1,17 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/common/Header';
 import { Sidebar, NavTab } from './components/common/Sidebar';
-import { Dashboard } from './components/dashboard/Dashboard';
 import { DirectBilling } from './components/billing/DirectBilling';
 import { PosScreen } from './components/pos/PosScreen';
 import { KotManagement } from './components/kot/KotManagement';
-import { BillHistoryReprint } from './components/billing/BillHistoryReprint';
-import { MenuManagement } from './components/menu/MenuManagement';
-import { InventoryManagement } from './components/inventory/InventoryManagement';
-import { ReportsView } from './components/reports/ReportsView';
-import { UserManagement } from './components/users/UserManagement';
-import { SettingsView } from './components/settings/SettingsView';
 import { AuthModal } from './components/auth/AuthModal';
 import { PrintingReceiptAnimation } from './components/common/PrintingReceiptAnimation';
 import { DailyBackupNotificationToast } from './components/common/DailyBackupNotificationToast';
@@ -23,6 +16,23 @@ import { db } from './services/firebase';
 import { DEFAULT_RESTAURANT_LOGO } from './data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from './services/brandLogoService';
 import { Zap, ShoppingBag, ChefHat, Receipt, MoreHorizontal, LayoutDashboard } from 'lucide-react';
+
+// Lazy-loaded heavy modules for optimized bundle splitting & faster initial load
+const Dashboard = lazy(() => import('./components/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })));
+const ReportsView = lazy(() => import('./components/reports/ReportsView').then((m) => ({ default: m.ReportsView })));
+const InventoryManagement = lazy(() => import('./components/inventory/InventoryManagement').then((m) => ({ default: m.InventoryManagement })));
+const UserManagement = lazy(() => import('./components/users/UserManagement').then((m) => ({ default: m.UserManagement })));
+const MenuManagement = lazy(() => import('./components/menu/MenuManagement').then((m) => ({ default: m.MenuManagement })));
+const SettingsView = lazy(() => import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView })));
+const BillHistoryReprint = lazy(() => import('./components/billing/BillHistoryReprint').then((m) => ({ default: m.BillHistoryReprint })));
+
+const ModuleLoadingFallback: React.FC = () => (
+  <div className="flex-1 flex flex-col items-center justify-center min-h-[360px] p-8 text-slate-500" role="status" aria-label="Loading module">
+    <div className="w-9 h-9 border-3 border-amber-600 border-t-transparent rounded-full animate-spin mb-3" />
+    <p className="text-sm font-medium text-slate-700">Loading module...</p>
+    <p className="text-xs text-slate-400 mt-0.5">Please wait a moment</p>
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const { currentUser, isOwner, isManager, isWaiter } = useAuth();
@@ -184,66 +194,68 @@ const AppContent: React.FC = () => {
 
         {/* Dynamic Screen View Area (Occupies 100% width and full vertical height) */}
         <main className="flex-1 flex flex-col min-w-0 w-full bg-slate-50 overflow-hidden relative">
-          {activeTab === 'dashboard' && (
-            <Dashboard 
-              settings={settings} 
-              onNavigate={(tab) => setActiveTab(tab)} 
-            />
-          )}
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            {activeTab === 'dashboard' && (
+              <Dashboard 
+                settings={settings} 
+                onNavigate={(tab) => setActiveTab(tab)} 
+              />
+            )}
 
-          {activeTab === 'pos' && (
-            <PosScreen settings={settings} />
-          )}
+            {activeTab === 'pos' && (
+              <PosScreen settings={settings} />
+            )}
 
-          {activeTab === 'direct-billing' && (
-            <DirectBilling settings={settings} />
-          )}
+            {activeTab === 'direct-billing' && (
+              <DirectBilling settings={settings} />
+            )}
 
-          {activeTab === 'kot' && (
-            <KotManagement 
-              settings={settings} 
-              initialSubTab="create"
-              onTabChange={(subTab) => {
-                if (subTab === 'running') setActiveTab('running-kot');
-                else if (subTab === 'create') setActiveTab('kot');
-              }}
-            />
-          )}
+            {activeTab === 'kot' && (
+              <KotManagement 
+                settings={settings} 
+                initialSubTab="create"
+                onTabChange={(subTab) => {
+                  if (subTab === 'running') setActiveTab('running-kot');
+                  else if (subTab === 'create') setActiveTab('kot');
+                }}
+              />
+            )}
 
-          {activeTab === 'running-kot' && (
-            <KotManagement 
-              settings={settings} 
-              initialSubTab="running"
-              onTabChange={(subTab) => {
-                if (subTab === 'running') setActiveTab('running-kot');
-                else if (subTab === 'create') setActiveTab('kot');
-              }}
-            />
-          )}
+            {activeTab === 'running-kot' && (
+              <KotManagement 
+                settings={settings} 
+                initialSubTab="running"
+                onTabChange={(subTab) => {
+                  if (subTab === 'running') setActiveTab('running-kot');
+                  else if (subTab === 'create') setActiveTab('kot');
+                }}
+              />
+            )}
 
-          {activeTab === 'reprint' && (
-            <BillHistoryReprint settings={settings} />
-          )}
+            {activeTab === 'reprint' && (
+              <BillHistoryReprint settings={settings} />
+            )}
 
-          {activeTab === 'menu' && (
-            <MenuManagement />
-          )}
+            {activeTab === 'menu' && (
+              <MenuManagement />
+            )}
 
-          {activeTab === 'inventory' && (
-            <InventoryManagement />
-          )}
+            {activeTab === 'inventory' && (
+              <InventoryManagement />
+            )}
 
-          {activeTab === 'reports' && (
-            <ReportsView settings={settings} />
-          )}
+            {activeTab === 'reports' && (
+              <ReportsView settings={settings} />
+            )}
 
-          {activeTab === 'users' && (
-            <UserManagement />
-          )}
+            {activeTab === 'users' && (
+              <UserManagement />
+            )}
 
-          {activeTab === 'settings' && (
-            <SettingsView settings={settings} />
-          )}
+            {activeTab === 'settings' && (
+              <SettingsView settings={settings} />
+            )}
+          </Suspense>
         </main>
 
       </div>

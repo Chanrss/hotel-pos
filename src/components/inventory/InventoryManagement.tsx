@@ -34,7 +34,9 @@ import {
   Table as TableIcon,
   LayoutGrid,
   SlidersHorizontal,
-  Check
+  Check,
+  FileSpreadsheet,
+  Upload
 } from 'lucide-react';
 import { BulkUpdateModal, BulkItemRow } from './BulkUpdateModal';
 import { useAuth } from '../../context/AuthContext';
@@ -114,7 +116,7 @@ export const InventoryManagement: React.FC = () => {
   const [itemsViewMode, setItemsViewMode] = useState<'GRID' | 'TABLE'>('GRID');
   const [itemsFilterStatus, setItemsFilterStatus] = useState<'ALL' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'SELECTED'>('ALL');
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
-  const [bulkModalTab, setBulkModalTab] = useState<'PRICE' | 'STOCK' | 'MATRIX'>('PRICE');
+  const [bulkModalTab, setBulkModalTab] = useState<'PRICE' | 'STOCK' | 'MATRIX' | 'TEMPLATE'>('PRICE');
 
   // Modals
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
@@ -477,6 +479,60 @@ export const InventoryManagement: React.FC = () => {
       });
   }, [selectedItemIds, inventory, menuItems, selectedCategoryName]);
 
+  // Complete catalog items mapped to BulkItemRow for template generation and spreadsheet lookup
+  const allBulkRows = useMemo<BulkItemRow[]>(() => {
+    const allPool: InventoryItem[] = [...inventory];
+    menuItems.forEach((m) => {
+      if (!allPool.some((i) => i.id === m.id || (i.itemCode && m.itemCode && i.itemCode.toUpperCase() === m.itemCode.toUpperCase()))) {
+        allPool.push({
+          id: m.id,
+          itemCode: m.itemCode || 'ITEM',
+          itemName: m.itemName,
+          itemNameTamil: m.itemNameTamil || '',
+          category: m.categoryName || 'Other',
+          unit: 'Pcs',
+          minimumStock: 10,
+          currentStock: 0,
+          active: true,
+          isCountBased: true,
+          isInitialized: false,
+          initialStock: 0,
+          purchasedCount: 0,
+          soldCount: 0,
+          missingCount: 0,
+          remainingCount: 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        });
+      }
+    });
+
+    return allPool.map((item) => {
+      const m = menuItems.find(
+        (mi) => mi.id === item.id || (mi.itemCode && item.itemCode && mi.itemCode.trim().toUpperCase() === item.itemCode.trim().toUpperCase())
+      );
+      const metrics = calculateStockMetrics(item);
+      return {
+        id: item.id,
+        itemCode: item.itemCode || 'ITEM',
+        itemName: item.itemName,
+        itemNameTamil: item.itemNameTamil,
+        category: item.category || 'Other',
+        unit: item.unit || 'Pcs',
+        currentStock: item.currentStock || 0,
+        minimumStock: item.minimumStock || 10,
+        isInitialized: !!item.isInitialized,
+        initialStock: item.initialStock || 0,
+        purchasedCount: item.purchasedCount || 0,
+        soldCount: item.soldCount || 0,
+        missingCount: item.missingCount || 0,
+        remainingCount: metrics.remainingCount,
+        nonAcPrice: m ? m.nonAcPrice : 0,
+        acPrice: m ? m.acPrice : (m ? m.nonAcPrice : 0)
+      };
+    });
+  }, [inventory, menuItems]);
+
   // Bulk Selection Helper Handlers
   const isItemSelected = (id: string) => selectedItemIds.includes(id);
 
@@ -509,8 +565,8 @@ export const InventoryManagement: React.FC = () => {
     setSelectedItemIds(lowIds);
   };
 
-  const handleOpenBulkModal = (tab: 'PRICE' | 'STOCK' | 'MATRIX') => {
-    if (selectedItemIds.length === 0) {
+  const handleOpenBulkModal = (tab: 'PRICE' | 'STOCK' | 'MATRIX' | 'TEMPLATE') => {
+    if (tab !== 'TEMPLATE' && selectedItemIds.length === 0) {
       // Auto-select all items in current view if none selected
       const visibleIds = displayedCategoryItems.map((i) => i.id);
       if (visibleIds.length > 0) {
@@ -819,6 +875,16 @@ export const InventoryManagement: React.FC = () => {
 
         {/* Header Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <button
+            type="button"
+            onClick={() => handleOpenBulkModal('TEMPLATE')}
+            className="px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 shadow-2xs transition-colors cursor-pointer"
+            title="Upload an Excel spreadsheet template to adjust stock levels for multiple items at once"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <span>Upload Stock Template</span>
+          </button>
+
           <button
             type="button"
             onClick={() => handleOpenBulkModal('PRICE')}
@@ -2584,6 +2650,16 @@ export const InventoryManagement: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => handleOpenBulkModal('TEMPLATE')}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+              title="Upload an Excel template to adjust stock"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Upload Template</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleOpenBulkModal('MATRIX')}
               className="hidden md:flex px-3 py-1.5 sm:px-3.5 sm:py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs rounded-xl shadow-xs items-center gap-1.5 cursor-pointer transition-all"
             >
@@ -2604,11 +2680,12 @@ export const InventoryManagement: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* BULK UPDATE MODAL (PRICE, STOCK, MATRIX)                                  */}
+      {/* BULK UPDATE MODAL (PRICE, STOCK, MATRIX, TEMPLATE)                        */}
       {/* ========================================================================= */}
       <BulkUpdateModal
         isOpen={bulkModalOpen}
         selectedItems={selectedBulkRows}
+        allItems={allBulkRows}
         initialTab={bulkModalTab}
         onClose={() => setBulkModalOpen(false)}
         onApplySuccess={(message) => {
