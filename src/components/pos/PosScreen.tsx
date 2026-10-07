@@ -764,8 +764,9 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
           );
         })}
 
-        {/* Quick Dosa & Idly Shortcut Tabs */}
+        {/* Quick Dosa & Idly Shortcut Tabs (only if not already provided by categories) */}
         {isDosaIdlyPeriodAvailable &&
+          !categories.some((c) => c.id === 'cat_dosa' || c.id === 'cat_idly') &&
           CONSOLIDATED_POS_CATEGORIES.map((cCat) => {
             const count = getPosCategoryDishCount(cCat, menuItems, categories);
             const isSelected = selectedCategory === cCat.id;
@@ -978,32 +979,24 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <span className="inline-block font-mono font-bold text-2xs bg-slate-900 text-amber-400 px-1.5 py-0.2 rounded">
+                            <span className="inline-block font-mono text-2xs text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
                               Code: {item.itemCode}
                             </span>
                           </div>
                         </div>
 
-                        {/* Item Name (English only on POS screen) */}
+                        {/* Item Name (English only on POS screen) - Only item name in bold */}
                         <div className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug group-hover:text-amber-950 min-h-[2.1rem]">
                           {item.itemName}
                         </div>
                       </div>
 
-                      {/* Selected Pricing Row: AC Price & Non-AC Price */}
+                      {/* Selected Pricing Row: Clean display without black box, non-bold price */}
                       <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 font-mono text-2xs w-full">
-                        <span className={`px-1 py-0.2 rounded ${
-                          priceType === 'AC'
-                            ? 'bg-amber-500 text-slate-950 font-black'
-                            : 'text-slate-500 font-semibold'
-                        }`}>
+                        <span className={priceType === 'AC' ? 'text-amber-800 font-medium' : 'text-slate-400'}>
                           AC ₹{item.acPrice}
                         </span>
-                        <span className={`px-1 py-0.2 rounded ${
-                          priceType === 'NON_AC'
-                            ? 'bg-slate-900 text-white font-black'
-                            : 'text-slate-500 font-semibold'
-                        }`}>
+                        <span className={priceType === 'NON_AC' ? 'text-slate-700 font-medium' : 'text-slate-400'}>
                           Non-AC ₹{item.nonAcPrice}
                         </span>
                       </div>

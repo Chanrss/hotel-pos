@@ -3,11 +3,13 @@ import { MenuItem, Category } from '../types';
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat_hot_drinks', categoryCode: 'HOT', categoryName: 'Hot Drinks & Beverages', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 1, active: true, createdAt: Date.now(), updatedAt: Date.now() },
   { id: 'cat_tiffin', categoryCode: 'TIF', categoryName: 'Tiffin & Breakfast', startTime: '06:00 AM', endTime: '11:00 AM', displayOrder: 2, active: true, createdAt: Date.now(), updatedAt: Date.now() },
-  { id: 'cat_meals', categoryCode: 'MLS', categoryName: 'Meals & Variety Rice', startTime: '11:00 AM', endTime: '03:30 PM', displayOrder: 3, active: true, createdAt: Date.now(), updatedAt: Date.now() },
-  { id: 'cat_dinner', categoryCode: 'DIN', categoryName: 'Parotta, Rice & Chinese', startTime: '06:00 PM', endTime: '11:00 PM', displayOrder: 4, active: true, createdAt: Date.now(), updatedAt: Date.now() },
-  { id: 'cat_snacks', categoryCode: 'SNK', categoryName: 'Snacks, Sweets & Savouries', startTime: '03:00 PM', endTime: '09:00 PM', displayOrder: 5, active: true, createdAt: Date.now(), updatedAt: Date.now() },
-  { id: 'cat_cool_drinks', categoryCode: 'COL', categoryName: 'Cold Beverages & Soft Drinks', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 6, active: true, createdAt: Date.now(), updatedAt: Date.now() },
-  { id: 'cat_icecream', categoryCode: 'ICE', categoryName: 'Amul Ice Creams', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 7, active: true, createdAt: Date.now(), updatedAt: Date.now() }
+  { id: 'cat_dosa', categoryCode: 'DOSA', categoryName: 'Dosa', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 3, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_idly', categoryCode: 'IDLY', categoryName: 'Idly', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 4, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_meals', categoryCode: 'MLS', categoryName: 'Meals & Variety Rice', startTime: '11:00 AM', endTime: '03:30 PM', displayOrder: 5, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_dinner', categoryCode: 'DIN', categoryName: 'Parotta, Rice & Chinese', startTime: '06:00 PM', endTime: '11:00 PM', displayOrder: 6, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_snacks', categoryCode: 'SNK', categoryName: 'Snacks, Sweets & Savouries', startTime: '03:00 PM', endTime: '09:00 PM', displayOrder: 7, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_cool_drinks', categoryCode: 'COL', categoryName: 'Cold Beverages & Soft Drinks', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 8, active: true, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'cat_icecream', categoryCode: 'ICE', categoryName: 'Amul Ice Creams', startTime: '06:00 AM', endTime: '11:00 PM', displayOrder: 9, active: true, createdAt: Date.now(), updatedAt: Date.now() }
 ];
 
 const RAW_FALLBACK_ITEMS: Array<{

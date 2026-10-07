@@ -265,25 +265,27 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
     return firestoreMenuItems;
   }, [firestoreMenuItems]);
 
-  // Available categories (supports multi-category categoryIds: string[])
+  // Available categories (strictly the 9 clean menu categories)
   const categories = useMemo(() => {
-    const set = new Map<string, string>();
-    DEFAULT_CATEGORIES.forEach((c) => {
-      if (c.active !== false) {
-        set.set(c.id, c.categoryName || c.name || c.id);
-      }
-    });
-    menuItems.forEach((m) => {
-      const catIds = getItemCategoryIds(m);
-      catIds.forEach((cid, idx) => {
-        if (!set.has(cid)) {
-          const name = (Array.isArray(m.categoryNames) && m.categoryNames[idx]) || m.categoryName || cid;
-          set.set(cid, name);
+    let source = DEFAULT_CATEGORIES;
+    try {
+      const stored = localStorage.getItem('pos_local_categories');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          source = parsed;
         }
-      });
-    });
-    return Array.from(set.entries()).map(([id, name]) => ({ id, name }));
-  }, [menuItems]);
+      }
+    } catch (e) {}
+
+    return source
+      .filter((c) => c.active !== false)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+      .map((c) => ({
+        id: c.id,
+        name: c.categoryName || c.name || c.id
+      }));
+  }, []);
 
   // Filtered quick dishes (supports multi-category categoryIds and deduplicates ALL)
   const filteredQuickDishes = useMemo(() => {

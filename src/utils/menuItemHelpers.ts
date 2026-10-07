@@ -345,6 +345,13 @@ export function itemBelongsToCategory(
   const lowerTarget = normTarget.toLowerCase();
   if (lowerTarget === 'all') return true;
 
+  if (lowerTarget === 'cat_dosa' || lowerTarget === 'dosa') {
+    return isDosaItem(item);
+  }
+  if (lowerTarget === 'cat_idly' || lowerTarget === 'idly') {
+    return isIdlyItem(item);
+  }
+
   const itemCatIds = getItemCategoryIds(item);
   const currentCategoryObj = categories.find(
     (c) =>
@@ -447,34 +454,32 @@ export function filterPosMenuItems(
     } else if (lowerSelected === 'all') {
       if (activeServicePeriod === 'TIFFIN') {
         const matchesTiffinPeriod =
-          itemMatchesPeriodPredicate(isTiffinCategory) || (!hasExplicitMultiArray && isTiffinDinnerItem);
+          itemMatchesPeriodPredicate(isTiffinCategory) || isTiffinDinnerItem;
         if (!matchesTiffinPeriod) return false;
       } else if (activeServicePeriod === 'DINNER') {
         const matchesDinnerPeriod =
-          itemMatchesPeriodPredicate(isDinnerCategory) || (!hasExplicitMultiArray && isTiffinDinnerItem);
+          itemMatchesPeriodPredicate(isDinnerCategory) || isTiffinDinnerItem;
         if (!matchesDinnerPeriod) return false;
       } else if (activeServicePeriod === 'LUNCH') {
-        const matchesLunchPeriod = hasExplicitMultiArray
-          ? itemMatchesPeriodPredicate(isLunchCategory)
-          : itemMatchesPeriodPredicate(isLunchCategory) && !isTiffinDinnerItem;
+        const matchesLunchPeriod =
+          itemMatchesPeriodPredicate(isLunchCategory) && !isTiffinDinnerItem;
         if (!matchesLunchPeriod) return false;
       }
     } else if (isTiffin) {
       const matchesPeriodOrShared =
         matchesDirectCategory ||
         itemMatchesPeriodPredicate(isTiffinCategory) ||
-        (!hasExplicitMultiArray && isTiffinDinnerItem);
+        isTiffinDinnerItem;
       if (!matchesPeriodOrShared) return false;
     } else if (isDinner) {
       const matchesPeriodOrShared =
         matchesDirectCategory ||
         itemMatchesPeriodPredicate(isDinnerCategory) ||
-        (!hasExplicitMultiArray && isTiffinDinnerItem);
+        isTiffinDinnerItem;
       if (!matchesPeriodOrShared) return false;
     } else if (isLunch) {
-      const matchesLunch = hasExplicitMultiArray
-        ? matchesDirectCategory || itemMatchesPeriodPredicate(isLunchCategory)
-        : (matchesDirectCategory || itemMatchesPeriodPredicate(isLunchCategory)) && !isTiffinDinnerItem;
+      const matchesLunch =
+        (matchesDirectCategory || itemMatchesPeriodPredicate(isLunchCategory)) && !isTiffinDinnerItem;
       if (!matchesLunch) return false;
     } else {
       if (!matchesDirectCategory) return false;
@@ -523,15 +528,14 @@ export function getPosCategoryDishCount(
   }
 
   return uniqueItems.filter((item) => {
-    const hasExplicitMultiArray = Array.isArray(item.categoryIds) && item.categoryIds.length > 0;
     const directMatch = itemBelongsToCategory(item, category.id, allCategories);
     if (directMatch) {
-      if (!hasExplicitMultiArray && isLunchCategory(category) && (isDosaItem(item) || isIdlyItem(item))) {
+      if (isLunchCategory(category) && (isDosaItem(item) || isIdlyItem(item))) {
         return false;
       }
       return true;
     }
-    if (!hasExplicitMultiArray && (isTiffinCategory(category) || isDinnerCategory(category))) {
+    if (isTiffinCategory(category) || isDinnerCategory(category)) {
       return isDosaItem(item) || isIdlyItem(item);
     }
     return false;

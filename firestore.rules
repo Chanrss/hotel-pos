@@ -103,6 +103,10 @@ service cloud.firestore {
     match /daily_backups/{backupId} {
       allow read, write: if true;
     }
+
+    match /test/{testId} {
+      allow read, write: if true;
+    }
   }
 }
 

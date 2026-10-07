@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Wifi, 
-  WifiOff, 
   Clock, 
   LogOut, 
   LogIn, 
   UtensilsCrossed, 
   Menu as MenuIcon,
   Receipt,
-  Printer,
   Maximize2,
   Minimize2,
   LayoutDashboard,
@@ -22,19 +19,13 @@ import {
   Users,
   Settings,
   ChevronLeft,
-  ChevronRight,
-  Cloud,
-  UserCheck
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { RestaurantSettings } from '../../types';
 import { DEFAULT_RESTAURANT_LOGO, SRI_SARAVANA_BHAVAN_SVG } from '../../data/defaultLogo';
 import { getBusinessDate, formatBillNumber } from '../../services/billNumberEngine';
 import { getLocalBills } from '../../services/localBillStore';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { PrinterStatusService, PrinterHealthCheck } from '../../services/printerStatusService';
-import { PrinterTroubleshootModal } from './PrinterTroubleshootModal';
 import { NavTab } from './Sidebar';
 
 export interface HeaderProps {
@@ -55,12 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigateSettings 
 }) => {
   const { currentUser, isOnline: authOnline, logout, firebaseUser, hasPermission, isOwner, isManager, isWaiter } = useAuth();
-  const [networkOnline, setNetworkOnline] = useState<boolean>(navigator.onLine);
-  const [firestoreServerSynced, setFirestoreServerSynced] = useState<boolean>(false);
   const [time, setTime] = useState(new Date());
   const [currentBillNo, setCurrentBillNo] = useState<string>('01');
-  const [printerCheck, setPrinterCheck] = useState<PrinterHealthCheck | null>(null);
-  const [showPrinterModal, setShowPrinterModal] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Track Fullscreen State
@@ -83,58 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
       console.warn('Fullscreen request notice:', err);
     }
   };
-
-  // Subscribe to live printer status
-  useEffect(() => {
-    const unsub = PrinterStatusService.subscribe((check) => {
-      setPrinterCheck(check);
-    });
-    return unsub;
-  }, [settings]);
-
-  // Real-time connectivity listener + Firestore sync status
-  useEffect(() => {
-    const handleOnline = () => setNetworkOnline(true);
-    const handleOffline = () => {
-      setNetworkOnline(false);
-      setFirestoreServerSynced(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    let unsubscribe: (() => void) | null = null;
-    try {
-      const docRef = doc(db, 'settings', 'restaurant');
-      unsubscribe = onSnapshot(
-        docRef,
-        { includeMetadataChanges: true },
-        (snapshot) => {
-          const isFromCache = snapshot.metadata.fromCache;
-          setFirestoreServerSynced(!isFromCache);
-          if (navigator.onLine) {
-            setNetworkOnline(true);
-          }
-        },
-        () => {
-          setFirestoreServerSynced(false);
-          if (!navigator.onLine) {
-            setNetworkOnline(false);
-          }
-        }
-      );
-    } catch (err) {
-      console.debug('Firestore connectivity listener note:', err);
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
-
-  const isCurrentlyOnline = networkOnline && authOnline !== false;
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -305,9 +240,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   ];
 
-  const roleLabel = (currentUser?.roleId || 'STAFF').toUpperCase();
-  const printerReady = printerCheck?.status === 'READY' || printerCheck?.status === 'MOCK';
-
   return (
     <header className="sticky top-0 z-40 w-full flex flex-col shrink-0 select-none bg-slate-950 text-slate-100 border-b border-slate-800">
       {/* Compact Top Terminal Status Bar (h-10 / 40px) */}
@@ -353,7 +285,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Center/Right: Terminal Telemetry Badges (Bill #, Date/Time, Online, Sync, Printer, User/Role) */}
+        {/* Center/Right: Terminal Telemetry Badges (Bill #, Date/Time, Fullscreen, Login/Logout) */}
         <div className="flex items-center justify-end gap-1.5 shrink-0">
           
           {/* Current Bill Sequence */}
@@ -374,74 +306,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-slate-600">•</span>
             <span className="text-white font-semibold">{timeString}</span>
           </div>
-
-          {/* Online / Offline & Sync Status */}
-          <div
-            id="header-connectivity-status"
-            className={`h-6 px-2 rounded border flex items-center gap-1 text-2xs font-mono font-bold shrink-0 ${
-              isCurrentlyOnline
-                ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700/60'
-                : 'bg-red-950/80 text-red-300 border-red-700/60'
-            }`}
-            title={
-              isCurrentlyOnline
-                ? `Online • ${firestoreServerSynced ? 'Cloud Synced' : 'Local Cache Ready'}`
-                : 'Offline Mode • Saving Locally'
-            }
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                isCurrentlyOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'
-              }`}
-            />
-            {isCurrentlyOnline ? (
-              <Wifi className="w-3 h-3 text-emerald-400 shrink-0" />
-            ) : (
-              <WifiOff className="w-3 h-3 text-red-400 shrink-0" />
-            )}
-            <span className="hidden sm:inline">{isCurrentlyOnline ? 'ONLINE' : 'OFFLINE'}</span>
-            <span className="hidden xl:inline text-slate-500">|</span>
-            <Cloud className="w-3 h-3 hidden xl:inline text-slate-400" />
-            <span className="hidden xl:inline text-2xs">
-              {firestoreServerSynced ? 'SYNCED' : 'LOCAL'}
-            </span>
-          </div>
-
-          {/* Printer Status Button */}
-          <button
-            id="header-printer-status-btn"
-            type="button"
-            onClick={() => setShowPrinterModal(true)}
-            className={`h-6 px-2 rounded border flex items-center gap-1 text-2xs font-mono font-bold cursor-pointer transition-colors shrink-0 ${
-              printerReady
-                ? 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700'
-                : 'bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border-amber-700/60'
-            }`}
-            title="Thermal Printer Status & Diagnostics"
-          >
-            <Printer className={`w-3 h-3 shrink-0 ${printerReady ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span className="hidden md:inline">
-              {printerCheck?.status === 'MOCK' ? 'PRINTER: SIM' : printerReady ? 'PRINTER: OK' : 'PRINTER'}
-            </span>
-          </button>
-
-          {/* Current User & Role Badge (Click to Switch User with Username & PIN) */}
-          {currentUser && (
-            <button
-              type="button"
-              onClick={onOpenAuth}
-              className="hidden sm:flex items-center gap-1.5 h-6 px-2 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-2xs shrink-0 cursor-pointer transition-colors"
-              title={`Logged in as ${currentUser.name || currentUser.username} (${roleLabel}) — Click to switch user`}
-            >
-              <UserCheck className="w-3 h-3 text-amber-400 shrink-0" />
-              <span className="font-semibold text-slate-200 truncate max-w-[90px]">
-                {currentUser.name?.split(' ')[0] || 'Staff'}
-              </span>
-              <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-[10px]">
-                {roleLabel}
-              </span>
-            </button>
-          )}
 
           {/* Fullscreen Toggle */}
           <button
@@ -531,13 +395,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
       </div>
-
-      <PrinterTroubleshootModal
-        isOpen={showPrinterModal}
-        onClose={() => setShowPrinterModal(false)}
-        settings={settings}
-        onNavigateSettings={onNavigateSettings}
-      />
     </header>
   );
 };

@@ -28,9 +28,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
+  Category,
   Kot, 
   KotItem, 
   KotStatus, 
+  KotItemStatus,
   MenuItem, 
   OrderType, 
   PriceType, 
@@ -60,6 +62,7 @@ import {
   saveKotLocally, 
   getLocalKots, 
   updateLocalKotStatus, 
+  updateLocalKotItemStatus,
   appendItemsToLocalKot, 
   mergeKots, 
   subscribeToLocalKots 
@@ -110,6 +113,16 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
   }, [initialSubTab]);
   const [runningKots, setRunningKots] = useState<{ kot: Kot; items: KotItem[] }[]>([]);
   const [firestoreMenuItems, setFirestoreMenuItems] = useState<MenuItem[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>(() => {
+    try {
+      const stored = localStorage.getItem('pos_local_categories');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_CATEGORIES;
+  });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('ACTIVE'); // ACTIVE, ALL, OPEN, SENT, PREPARING, READY, COMPLETED, BILLED, CANCELLED
 
@@ -208,6 +221,19 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       setLoading(false);
     });
 
+    // Categories listener for clean sync with Menu Management
+    const unsubCats = onSnapshot(collection(db, 'categories'), (snapshot) => {
+      const cats: Category[] = [];
+      snapshot.forEach((d) => cats.push({ id: d.id, ...d.data() } as Category));
+      if (cats.length > 0) {
+        const activeCats = cats.filter((c) => c.active !== false).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+        setCategoriesList(activeCats);
+        localStorage.setItem('pos_local_categories', JSON.stringify(activeCats));
+      }
+    }, (err) => {
+      console.warn('KOT categories listener notice:', err);
+    });
+
     // Menu items listener
     const unsubMenu = onSnapshot(
       collection(db, 'menu_items'),
@@ -229,6 +255,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
     return () => {
       unsubLocal();
       unsubKots();
+      unsubCats();
       unsubMenu();
     };
   }, []);
@@ -253,34 +280,26 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
     return map;
   }, [runningKots]);
 
-  // Categories list (supports multi-category categoryIds: string[])
+  // Categories list - strictly the 9 menu categories (no unwanted or stray item tags)
   const categories = useMemo(() => {
-    const distinct = new Map<string, string>();
-    DEFAULT_CATEGORIES.forEach((c) => {
-      if (c.active !== false) {
-        distinct.set(c.id, c.categoryName || c.name || c.id);
-      }
-    });
-    menuItems.forEach((m) => {
-      const catIds = getItemCategoryIds(m);
-      catIds.forEach((cid, idx) => {
-        if (!distinct.has(cid)) {
-          const name = (Array.isArray(m.categoryNames) && m.categoryNames[idx]) || m.categoryName || cid;
-          distinct.set(cid, name);
-        }
-      });
-    });
-
-    return Array.from(distinct.entries()).map(([id, name]) => ({ id, name }));
-  }, [menuItems]);
+    const list = categoriesList && categoriesList.length > 0 ? categoriesList : DEFAULT_CATEGORIES;
+    return list
+      .filter((c) => c.active !== false)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+      .map((c) => ({
+        id: c.id,
+        name: c.categoryName || c.name || c.id
+      }));
+  }, [categoriesList]);
 
   // Filtered menu items for creating KOT (supports multi-category categoryIds and deduplicates ALL)
   const filteredMenuItems = useMemo(() => {
     const uniqueItems = deduplicateMenuItems(menuItems);
+    const activeCats = categoriesList && categoriesList.length > 0 ? categoriesList : DEFAULT_CATEGORIES;
     return uniqueItems.filter((item) => {
       const matchesCat =
         selectedCategory === 'all' ||
-        itemBelongsToCategory(item, selectedCategory, DEFAULT_CATEGORIES);
+        itemBelongsToCategory(item, selectedCategory, activeCats);
       const q = searchItem.trim().toLowerCase();
       const matchesSearch = 
         !q || 
@@ -289,7 +308,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         (item.categoryName && item.categoryName.toLowerCase().includes(q));
       return matchesCat && matchesSearch;
     });
-  }, [menuItems, selectedCategory, searchItem]);
+  }, [menuItems, selectedCategory, searchItem, categoriesList]);
 
   // Helper to detect touch or mobile viewport
   const isTouchDeviceOrMobile = (): boolean => {
@@ -490,6 +509,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           priceType,
           unitPrice: BillingEngine.getApplicablePrice(sel.item, priceType),
           notes: sel.notes || '',
+          status: 'PENDING',
           printStatus: initialPrintStatus,
           ...(printSlip ? { printedAt: now } : {}),
           createdAt: now,
@@ -573,6 +593,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         priceType,
         unitPrice: BillingEngine.getApplicablePrice(sel.item, priceType),
         notes: sel.notes || '',
+        status: 'PENDING',
         printStatus: initialPrintStatus,
         ...(printSlip ? { printedAt: now } : {}),
         createdAt: now,
@@ -664,6 +685,119 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       setTimeout(() => setNotification(null), 2500);
     } catch (e: any) {
       setNotification({ type: 'error', message: 'Failed to update KOT status' });
+    }
+  };
+
+  // Helper to resolve an individual item's current status ('PENDING' | 'PREPARING' | 'SERVED')
+  const getItemStatus = (itm: KotItem, kotStatus: KotStatus): KotItemStatus => {
+    if (itm.status) return itm.status;
+    if (kotStatus === 'COMPLETED' || kotStatus === 'READY') return 'SERVED';
+    if (kotStatus === 'PREPARING') return 'PREPARING';
+    return 'PENDING';
+  };
+
+  // Helper to get color-coded badge style for KOT item status
+  const getItemStatusBadge = (status: KotItemStatus) => {
+    switch (status) {
+      case 'SERVED':
+        return {
+          label: 'Served',
+          badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 hover:border-emerald-500/60',
+          dotClass: 'bg-emerald-400',
+          nextStatus: 'PENDING' as KotItemStatus
+        };
+      case 'PREPARING':
+        return {
+          label: 'Preparing',
+          badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40 hover:bg-sky-500/30 hover:border-sky-500/60',
+          dotClass: 'bg-sky-400 animate-pulse',
+          nextStatus: 'SERVED' as KotItemStatus
+        };
+      case 'PENDING':
+      default:
+        return {
+          label: 'Pending',
+          badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 hover:border-amber-500/60',
+          dotClass: 'bg-amber-400',
+          nextStatus: 'PREPARING' as KotItemStatus
+        };
+    }
+  };
+
+  // Update an individual KOT item's status (Pending -> Preparing -> Served)
+  const handleUpdateKotItemStatus = async (
+    kotId: string,
+    itemId: string,
+    newStatus: KotItemStatus,
+    e?: React.MouseEvent
+  ) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    try {
+      const now = Date.now();
+
+      // 1. Immediately update locally (0ms UI latency)
+      updateLocalKotItemStatus(kotId, itemId, newStatus);
+
+      // 2. Immediately update React state
+      setRunningKots((prev) =>
+        prev.map((k) => {
+          if (k.kot.id !== kotId) return k;
+
+          const updatedItems = (k.items || []).map((itm) => {
+            if (itm.id === itemId || itm.itemId === itemId) {
+              return { ...itm, status: newStatus, updatedAt: now };
+            }
+            return itm;
+          });
+
+          const updatedKotItems = (k.kot.items || []).map((itm) => {
+            if (itm.id === itemId || itm.itemId === itemId) {
+              return { ...itm, status: newStatus, updatedAt: now };
+            }
+            return itm;
+          });
+
+          return {
+            kot: { ...k.kot, items: updatedKotItems, updatedAt: now },
+            items: updatedItems
+          };
+        })
+      );
+
+      // 3. Background Firestore commit
+      try {
+        const target = runningKots.find((k) => k.kot.id === kotId);
+        if (target) {
+          const updatedItems = (target.items || []).map((itm) =>
+            (itm.id === itemId || itm.itemId === itemId)
+              ? { ...itm, status: newStatus, updatedAt: now }
+              : itm
+          );
+          const p1 = updateDoc(doc(db, 'kots', kotId), {
+            items: updatedItems,
+            updatedAt: now
+          });
+          if (p1 && typeof p1.catch === 'function') {
+            p1.catch((err) => console.warn('Offline KOT item status notice:', err));
+          }
+        }
+
+        if (itemId) {
+          const p2 = updateDoc(doc(db, 'kot_items', itemId), {
+            status: newStatus,
+            updatedAt: now
+          });
+          if (p2 && typeof p2.catch === 'function') {
+            p2.catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn('Offline item status notice, saved locally:', err);
+      }
+    } catch (e: any) {
+      console.warn('Error updating item status:', e);
     }
   };
 
@@ -1338,21 +1472,26 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                               {(() => {
                                 const pDetails = getKotPrintDetails(kot, effectiveItems);
                                 return (
-                                  <span
-                                    className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border tracking-wider ${
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleSetKotPrintStatus(kot, effectiveItems, 'PRINTED', true);
+                                    }}
+                                    className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border tracking-wider cursor-pointer transition-all active:scale-95 touch-manipulation hover:opacity-90 ${
                                       pDetails.isPending
-                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
                                     }`}
                                     title={
                                       pDetails.isPending
-                                        ? 'Waiting for thermal printing'
-                                        : 'Printed on kitchen thermal printer'
+                                        ? 'Click to print KOT slip on kitchen printer'
+                                        : 'Click to reprint KOT slip on kitchen printer'
                                     }
                                   >
                                     <Printer className="w-2.5 h-2.5" />
                                     <span>{pDetails.isPending ? 'Pending Print' : 'Printed'}</span>
-                                  </span>
+                                  </button>
                                 );
                               })()}
                             </div>
@@ -1394,24 +1533,63 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <span>Dishes ({totalItemCount})</span>
                           <span>Qty</span>
                         </div>
-                        {effectiveItems.map((itm, idx) => (
-                          <div key={idx} className="flex justify-between items-start text-slate-200 border-b border-slate-900/60 pb-2 last:border-0 last:pb-0 gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="font-bold text-slate-100 text-sm sm:text-[13px] leading-snug break-words">
-                                {idx + 1}. {itm.itemName}
+                        {effectiveItems.map((itm, idx) => {
+                          const currentItemStatus = getItemStatus(itm, kot.status);
+                          const badge = getItemStatusBadge(currentItemStatus);
+                          const targetItemId = itm.id || `item_${idx}`;
+
+                          return (
+                            <div
+                              key={targetItemId || idx}
+                              className="flex justify-between items-start text-slate-200 border-b border-slate-900/60 pb-2 last:border-0 last:pb-0 gap-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-slate-100 text-sm sm:text-[13px] leading-snug break-words">
+                                    {idx + 1}. {itm.itemName}
+                                  </span>
+
+                                  {/* Color-coded Status Label Badge */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleUpdateKotItemStatus(kot.id, targetItemId, badge.nextStatus, e)}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-sans font-bold uppercase tracking-wider border cursor-pointer transition-all active:scale-95 touch-manipulation shadow-2xs ${badge.badgeClass}`}
+                                    title={`Status: ${badge.label}. Tap to advance to ${
+                                      badge.nextStatus === 'PENDING'
+                                        ? 'Pending'
+                                        : badge.nextStatus === 'PREPARING'
+                                        ? 'Preparing'
+                                        : 'Served'
+                                    }`}
+                                  >
+                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.dotClass}`} />
+                                    {currentItemStatus === 'SERVED' ? (
+                                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                                    ) : currentItemStatus === 'PREPARING' ? (
+                                      <Flame className="w-2.5 h-2.5 text-sky-400 shrink-0" />
+                                    ) : (
+                                      <Clock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                                    )}
+                                    <span>{badge.label}</span>
+                                  </button>
+                                </div>
+
+                                {itm.notes && (
+                                  <div className="mt-1">
+                                    <span className="inline-flex items-center gap-1 text-xs sm:text-[11px] text-amber-300 font-sans bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded font-medium">
+                                      <span>⚡</span>
+                                      <span>{itm.notes}</span>
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                              {itm.notes && (
-                                <span className="inline-flex items-center gap-1 text-xs sm:text-[11px] text-amber-300 font-sans bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded mt-1 font-medium">
-                                  <span>⚡</span>
-                                  <span>{itm.notes}</span>
-                                </span>
-                              )}
+
+                              <span className="font-black text-amber-400 text-base font-mono bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 shrink-0 ml-1.5 shadow-xs">
+                                ×{itm.quantity}
+                              </span>
                             </div>
-                            <span className="font-black text-amber-400 text-base font-mono bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800 shrink-0 ml-1.5 shadow-xs">
-                              ×{itm.quantity}
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Status Workflow Progress Controls */}
@@ -1489,16 +1667,22 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
                         <div className="flex items-center gap-1.5 ml-auto">
                           
-                          {/* Direct Print KOT Slip (Reduced secondary button size) */}
+                          {/* Dedicated Physical Thermal Print Button for Kitchen Staff */}
                           <button
                             type="button"
                             onClick={() => {
                               void handleSetKotPrintStatus(kot, effectiveItems, 'PRINTED', true);
                             }}
-                            className="w-7 h-7 p-1 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-300 rounded-md border border-slate-700 cursor-pointer transition-colors flex items-center justify-center shrink-0"
-                            title={`Direct Print KOT #${kot.kotNumber} to Kitchen Printer`}
+                            className="px-2.5 py-1.5 h-7 sm:h-8 bg-slate-800 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-400 hover:text-amber-300 font-bold text-xs rounded-md border border-slate-700 hover:border-amber-500/50 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
+                            title={`Print physical thermal ticket for KOT #${kot.kotNumber} (Kitchen Preparation Ticket)`}
                           >
                             <Printer className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Print</span>
+                            {kot.printCount && kot.printCount > 1 ? (
+                              <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono font-bold">
+                                ×{kot.printCount}
+                              </span>
+                            ) : null}
                           </button>
 
                           {/* Direct Convert to Bill Button */}

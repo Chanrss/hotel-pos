@@ -62,6 +62,7 @@ export type OrderType = 'DINE_IN' | 'TAKE_AWAY';
 
 export type KotStatus = 'OPEN' | 'SENT' | 'PREPARING' | 'READY' | 'COMPLETED' | 'BILLED' | 'CANCELLED';
 export type KotPrintStatus = 'PENDING' | 'PRINTED';
+export type KotItemStatus = 'PENDING' | 'PREPARING' | 'SERVED';
 
 export interface KotItem {
   id: string;
@@ -74,6 +75,7 @@ export interface KotItem {
   priceType: PriceType;
   unitPrice?: number;
   notes?: string;
+  status?: KotItemStatus;
   printStatus?: KotPrintStatus;
   printedAt?: number;
   createdAt: number;

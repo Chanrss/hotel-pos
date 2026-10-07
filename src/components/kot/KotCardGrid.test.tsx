@@ -318,4 +318,83 @@ describe('Responsive KOT Card Display and Grid Layout', () => {
     fireEvent.click(itemCard);
     expect(screen.getByText('×3')).toBeDefined();
   });
+
+  it('renders color-coded status badges for individual items and cycles their status on click', () => {
+    const testKot: Kot = {
+      id: 'kot_status_test',
+      kotNumber: 'KOT-77',
+      businessDate: '2026-09-07',
+      tableNumber: 'T-5',
+      orderType: 'DINE_IN',
+      waiterId: 'w1',
+      waiterName: 'Karthik',
+      status: 'OPEN',
+      createdBy: 'w1',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const testItems: KotItem[] = [
+      {
+        id: 'ki_p1',
+        kotId: 'kot_status_test',
+        itemId: 'i_1',
+        itemCode: '101',
+        itemName: 'Crispy Rava Dosa',
+        quantity: 1,
+        priceType: 'NON_AC',
+        status: 'PENDING',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      },
+      {
+        id: 'ki_p2',
+        kotId: 'kot_status_test',
+        itemId: 'i_2',
+        itemCode: '102',
+        itemName: 'Sambar Vada',
+        quantity: 2,
+        priceType: 'NON_AC',
+        status: 'PREPARING',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      },
+      {
+        id: 'ki_p3',
+        kotId: 'kot_status_test',
+        itemId: 'i_3',
+        itemCode: '103',
+        itemName: 'Filter Coffee',
+        quantity: 1,
+        priceType: 'NON_AC',
+        status: 'SERVED',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    ];
+
+    saveKotLocally(testKot, testItems);
+
+    render(<KotManagement settings={dummySettings} initialSubTab="running" />);
+
+    // Check for status labels in the running KOT card
+    const pendingBadge = screen.getByTitle(/Status: Pending/);
+    expect(pendingBadge).toBeDefined();
+    expect(pendingBadge.textContent).toContain('Pending');
+    expect(pendingBadge.className).toContain('bg-amber-500/20');
+
+    const prepBadge = screen.getByTitle(/Status: Preparing/);
+    expect(prepBadge).toBeDefined();
+    expect(prepBadge.textContent).toContain('Preparing');
+    expect(prepBadge.className).toContain('bg-sky-500/20');
+
+    const servedBadge = screen.getByTitle(/Status: Served/);
+    expect(servedBadge).toBeDefined();
+    expect(servedBadge.textContent).toContain('Served');
+    expect(servedBadge.className).toContain('bg-emerald-500/20');
+
+    // Click Pending badge -> should cycle to Preparing
+    fireEvent.click(pendingBadge);
+    expect(screen.getAllByTitle(/Status: Preparing/).length).toBe(2);
+  });
 });

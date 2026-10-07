@@ -1,4 +1,4 @@
-import { Kot, KotItem, KotStatus } from '../types';
+import { Kot, KotItem, KotStatus, KotItemStatus } from '../types';
 
 const LOCAL_KOTS_KEY = 'pos_local_kots';
 
@@ -90,6 +90,57 @@ export function updateLocalKotStatus(kotId: string, status: KotStatus): void {
   } catch (e) {
     console.warn('Error updating local KOT status:', e);
   }
+}
+
+/**
+ * Updates an individual KOT item's status in local storage immediately.
+ */
+export function updateLocalKotItemStatus(
+  kotId: string, 
+  itemId: string, 
+  status: KotItemStatus
+): { kot: Kot; items: KotItem[] } | null {
+  try {
+    const existing = getLocalKots();
+    const now = Date.now();
+    let resultKot: Kot | null = null;
+    let resultItems: KotItem[] = [];
+
+    const updated = existing.map((entry) => {
+      if (entry.kot.id === kotId) {
+        resultItems = (entry.items || []).map((i) => {
+          if (i.id === itemId || i.itemId === itemId) {
+            return {
+              ...i,
+              status,
+              updatedAt: now
+            };
+          }
+          return i;
+        });
+        resultKot = {
+          ...entry.kot,
+          items: resultItems,
+          updatedAt: now
+        };
+        return {
+          kot: resultKot,
+          items: resultItems
+        };
+      }
+      return entry;
+    });
+
+    localStorage.setItem(LOCAL_KOTS_KEY, JSON.stringify(updated));
+
+    if (resultKot) {
+      window.dispatchEvent(new CustomEvent('pos_kots_updated', { detail: { kot: resultKot, items: resultItems } }));
+      return { kot: resultKot, items: resultItems };
+    }
+  } catch (e) {
+    console.warn('Error updating local KOT item status:', e);
+  }
+  return null;
 }
 
 /**
