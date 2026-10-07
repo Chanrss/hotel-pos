@@ -67,8 +67,8 @@ import {
 
 interface KotManagementProps {
   settings?: RestaurantSettings;
-  initialSubTab?: 'running' | 'create';
-  onTabChange?: (tab: 'running' | 'create') => void;
+  initialSubTab?: 'running' | 'create' | 'queue';
+  onTabChange?: (tab: 'running' | 'create' | 'queue') => void;
 }
 
 interface DraftKotItem {
@@ -98,7 +98,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
   const { currentUser } = useAuth();
 
   // Active View Tab
-  const [activeTab, setActiveTab] = useState<'running' | 'create'>(initialSubTab || 'running');
+  const [activeTab, setActiveTab] = useState<'running' | 'create' | 'queue'>(initialSubTab || 'running');
+  const [queueFilter, setQueueFilter] = useState<'PENDING' | 'PRINTED' | 'ALL'>('PENDING');
+  const [printingKotId, setPrintingKotId] = useState<string | null>(null);
+  const [batchPrintingQueue, setBatchPrintingQueue] = useState(false);
 
   useEffect(() => {
     if (initialSubTab) {
@@ -475,6 +478,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
       // If appending to an existing KOT
       if (appendingKot) {
+        const initialPrintStatus = printSlip ? 'PRINTED' : 'PENDING';
         const newKotItems: KotItem[] = selectedItems.map((sel, idx) => ({
           id: `${appendingKot.id}_item_app_${now}_${idx + 1}`,
           kotId: appendingKot.id,
@@ -486,15 +490,20 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           priceType,
           unitPrice: BillingEngine.getApplicablePrice(sel.item, priceType),
           notes: sel.notes || '',
+          printStatus: initialPrintStatus,
+          ...(printSlip ? { printedAt: now } : {}),
           createdAt: now,
           updatedAt: now
         }));
 
         const existingItems = appendingKot.items || [];
         const combinedItems = [...existingItems, ...newKotItems];
+        const hasAnyPending = combinedItems.some((i) => i.printStatus === 'PENDING');
 
         const updatedKot: Kot = {
           ...appendingKot,
+          printStatus: hasAnyPending ? 'PENDING' : 'PRINTED',
+          ...(printSlip ? { printedAt: now, printCount: (appendingKot.printCount || 0) + 1 } : {}),
           items: combinedItems,
           itemsCount: combinedItems.reduce((sum, i) => sum + i.quantity, 0),
           updatedAt: now
@@ -515,19 +524,24 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
         setNotification({
           type: 'success',
-          message: `Added ${selectedItems.length} items to ${appendingKot.kotNumber} (${appendingKot.tableNumber})!`
+          message: printSlip
+            ? `Added & printed ${selectedItems.length} items for ${appendingKot.kotNumber} (${appendingKot.tableNumber})!`
+            : `Added ${selectedItems.length} items to ${appendingKot.kotNumber} — queued in Pending KOT print queue!`
         });
 
         setAppendingKot(null);
         setSelectedItems([]);
-        setActiveTab('running');
-        if (onTabChange) onTabChange('running');
+        setActiveTab(printSlip ? 'running' : 'queue');
+        if (onTabChange) onTabChange(printSlip ? 'running' : 'queue');
         setTimeout(() => setNotification(null), 3500);
 
         // 4. Background Firestore commit
         try {
           const batch = writeBatch(db);
           batch.update(doc(db, 'kots', appendingKot.id), sanitizeForFirestore({
+            printStatus: updatedKot.printStatus,
+            printedAt: updatedKot.printedAt,
+            printCount: updatedKot.printCount,
             items: combinedItems,
             itemsCount: updatedKot.itemsCount,
             updatedAt: now
@@ -546,6 +560,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       // Brand New KOT
       const { kotNumber } = await allocateNextKotNumber(businessDate);
       const kotId = `kot_${now}_${Math.random().toString(36).substring(2, 6)}`;
+      const initialPrintStatus = printSlip ? 'PRINTED' : 'PENDING';
 
       const kotItems: KotItem[] = selectedItems.map((sel, idx) => ({
         id: `${kotId}_item_${idx + 1}`,
@@ -558,6 +573,8 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         priceType,
         unitPrice: BillingEngine.getApplicablePrice(sel.item, priceType),
         notes: sel.notes || '',
+        printStatus: initialPrintStatus,
+        ...(printSlip ? { printedAt: now } : {}),
         createdAt: now,
         updatedAt: now
       }));
@@ -571,6 +588,8 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         waiterId: currentUser?.uid || 'staff',
         waiterName: currentUser?.name || 'Waiter',
         status: 'OPEN',
+        printStatus: initialPrintStatus,
+        ...(printSlip ? { printedAt: now, printCount: 1 } : { printCount: 0 }),
         items: kotItems,
         itemsCount: kotItems.reduce((sum, i) => sum + i.quantity, 0),
         createdBy: currentUser?.name || 'Staff',
@@ -590,10 +609,15 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       }
 
       // 4. UI Transition
-      setNotification({ type: 'success', message: `KOT ${kotNumber} generated for ${newKot.tableNumber}!` });
+      setNotification({
+        type: 'success',
+        message: printSlip
+          ? `KOT ${kotNumber} generated & sent to thermal printer for ${newKot.tableNumber}!`
+          : `KOT ${kotNumber} added to Pending KOT print queue for ${newKot.tableNumber}!`
+      });
       setSelectedItems([]);
-      setActiveTab('running');
-      if (onTabChange) onTabChange('running');
+      setActiveTab(printSlip ? 'running' : 'queue');
+      if (onTabChange) onTabChange(printSlip ? 'running' : 'queue');
       setTimeout(() => setNotification(null), 3500);
 
       // 5. Write to Firestore in background
@@ -853,6 +877,161 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
     return Object.values(counts).sort((a, b) => b.qty - a.qty);
   }, [runningKots]);
 
+  // Helper: Determine whether a KOT or any of its items is waiting for thermal printing
+  const getKotPrintDetails = (kot: Kot, items: KotItem[]) => {
+    const effectiveItems = items && items.length > 0 ? items : kot.items || [];
+    const hasExplicitPendingItems = effectiveItems.some((it) => it.printStatus === 'PENDING');
+    const isKotExplicitlyPending = kot.printStatus === 'PENDING';
+    const isPending = hasExplicitPendingItems || isKotExplicitlyPending;
+
+    const pendingItems = effectiveItems.filter(
+      (it) => it.printStatus === 'PENDING' || (isKotExplicitlyPending && it.printStatus !== 'PRINTED')
+    );
+    const printedItems = effectiveItems.filter(
+      (it) => !pendingItems.some((p) => p.id === it.id)
+    );
+
+    return {
+      isPending,
+      status: (isPending ? 'PENDING' : 'PRINTED') as 'PENDING' | 'PRINTED',
+      effectiveItems,
+      pendingItems: pendingItems.length > 0 ? pendingItems : isPending ? effectiveItems : [],
+      printedItems
+    };
+  };
+
+  // All active KOTs with resolved print queue status
+  const kotPrintQueue = useMemo(() => {
+    return runningKots
+      .filter(({ kot }) => kot.status !== 'CANCELLED')
+      .map(({ kot, items }) => {
+        const details = getKotPrintDetails(kot, items);
+        return {
+          kot,
+          items: details.effectiveItems,
+          isPending: details.isPending,
+          printStatus: details.status,
+          pendingItems: details.pendingItems,
+          printedItems: details.printedItems
+        };
+      });
+  }, [runningKots]);
+
+  const pendingPrintKots = useMemo(
+    () => kotPrintQueue.filter((entry) => entry.isPending),
+    [kotPrintQueue]
+  );
+
+  const printedQueueKots = useMemo(
+    () => kotPrintQueue.filter((entry) => !entry.isPending),
+    [kotPrintQueue]
+  );
+
+  const filteredPrintQueue = useMemo(() => {
+    if (queueFilter === 'PENDING') return pendingPrintKots;
+    if (queueFilter === 'PRINTED') return printedQueueKots;
+    return kotPrintQueue;
+  }, [kotPrintQueue, pendingPrintKots, printedQueueKots, queueFilter]);
+
+  const totalPendingPrintItemsCount = useMemo(() => {
+    return pendingPrintKots.reduce(
+      (sum, entry) => sum + entry.pendingItems.reduce((acc, i) => acc + i.quantity, 0),
+      0
+    );
+  }, [pendingPrintKots]);
+
+  // Update a KOT and its items' thermal print status (PENDING or PRINTED)
+  const handleSetKotPrintStatus = async (
+    kot: Kot,
+    items: KotItem[],
+    nextStatus: 'PENDING' | 'PRINTED',
+    triggerThermalPrint = false
+  ) => {
+    const now = Date.now();
+    const effectiveItems = items && items.length > 0 ? items : kot.items || [];
+    const details = getKotPrintDetails(kot, effectiveItems);
+    const itemsToPrint =
+      details.pendingItems.length > 0 ? details.pendingItems : effectiveItems;
+
+    if (triggerThermalPrint) {
+      setPrintingKotId(kot.id);
+      try {
+        await PrintService.printKot(kot, itemsToPrint, settings);
+      } finally {
+        setPrintingKotId(null);
+      }
+    }
+
+    const updatedItems: KotItem[] = effectiveItems.map((it) => ({
+      ...it,
+      printStatus: nextStatus,
+      ...(nextStatus === 'PRINTED' ? { printedAt: it.printedAt || now } : {}),
+      updatedAt: now
+    }));
+
+    const updatedKot: Kot = {
+      ...kot,
+      printStatus: nextStatus,
+      ...(nextStatus === 'PRINTED'
+        ? { printedAt: now, printCount: (kot.printCount || 0) + (triggerThermalPrint ? 1 : 0) }
+        : {}),
+      items: updatedItems,
+      updatedAt: now
+    };
+
+    saveKotLocally(updatedKot, updatedItems);
+
+    setRunningKots((prev) =>
+      prev.map((k) => (k.kot.id === kot.id ? { kot: updatedKot, items: updatedItems } : k))
+    );
+
+    try {
+      const batch = writeBatch(db);
+      batch.update(
+        doc(db, 'kots', kot.id),
+        sanitizeForFirestore({
+          printStatus: updatedKot.printStatus,
+          printedAt: updatedKot.printedAt,
+          printCount: updatedKot.printCount,
+          items: updatedItems,
+          updatedAt: now
+        })
+      );
+      updatedItems.forEach((ki) => {
+        batch.set(doc(db, 'kot_items', ki.id), sanitizeForFirestore(ki), { merge: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.warn('Firestore KOT print status sync notice (saved locally):', err);
+    }
+
+    setNotification({
+      type: 'success',
+      message: triggerThermalPrint
+        ? `KOT ${kot.kotNumber} (${kot.tableNumber}) printed & marked as PRINTED!`
+        : `KOT ${kot.kotNumber} marked as ${nextStatus}.`
+    });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Batch print all pending KOTs in the queue
+  const handlePrintAllPendingKots = async () => {
+    if (pendingPrintKots.length === 0) return;
+    setBatchPrintingQueue(true);
+    try {
+      for (const entry of pendingPrintKots) {
+        await handleSetKotPrintStatus(entry.kot, entry.items, 'PRINTED', true);
+      }
+      setNotification({
+        type: 'success',
+        message: `Printed all ${pendingPrintKots.length} pending KOT ticket(s)!`
+      });
+      setTimeout(() => setNotification(null), 3500);
+    } finally {
+      setBatchPrintingQueue(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-full lg:h-full bg-slate-950 text-slate-100 p-1.5 sm:p-3.5 gap-1.5 sm:gap-3 overflow-y-auto lg:overflow-hidden pb-2 sm:pb-4">
       
@@ -885,6 +1064,36 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           >
             <Clock className="w-3.5 h-3.5" />
             <span>Running ({runningKots.filter(k => k.kot.status !== 'BILLED' && k.kot.status !== 'CANCELLED').length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setAppendingKot(null);
+              setActiveTab('queue');
+              if (onTabChange) onTabChange('queue');
+            }}
+            className={`h-8 sm:h-10 px-2.5 sm:px-4 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] ${
+              activeTab === 'queue'
+                ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+                : pendingPrintKots.length > 0
+                ? 'bg-amber-950/80 text-amber-300 hover:bg-amber-900/80 border border-amber-500/50'
+                : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+            }`}
+            title="Pending KOT Thermal Print Queue"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Pending KOT</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                activeTab === 'queue'
+                  ? 'bg-slate-950 text-amber-400'
+                  : pendingPrintKots.length > 0
+                  ? 'bg-amber-500 text-slate-950 animate-pulse'
+                  : 'bg-slate-900 text-slate-400'
+              }`}
+            >
+              {pendingPrintKots.length}
+            </span>
           </button>
 
           <button
@@ -1126,6 +1335,26 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border tracking-wider ${getStatusBadge(kot.status)}`}>
                                 {kot.status}
                               </span>
+                              {(() => {
+                                const pDetails = getKotPrintDetails(kot, effectiveItems);
+                                return (
+                                  <span
+                                    className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border tracking-wider ${
+                                      pDetails.isPending
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    }`}
+                                    title={
+                                      pDetails.isPending
+                                        ? 'Waiting for thermal printing'
+                                        : 'Printed on kitchen thermal printer'
+                                    }
+                                  >
+                                    <Printer className="w-2.5 h-2.5" />
+                                    <span>{pDetails.isPending ? 'Pending Print' : 'Printed'}</span>
+                                  </span>
+                                );
+                              })()}
                             </div>
 
                             <div className="text-xs text-slate-300 font-medium mt-1 flex items-center gap-1.5 flex-wrap">
@@ -1264,12 +1493,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <button
                             type="button"
                             onClick={() => {
-                              void PrintService.printKot(kot, effectiveItems, settings);
-                              setNotification({
-                                type: 'success',
-                                message: `KOT #${kot.kotNumber} sent to kitchen printer!`
-                              });
-                              setTimeout(() => setNotification(null), 3000);
+                              void handleSetKotPrintStatus(kot, effectiveItems, 'PRINTED', true);
                             }}
                             className="w-7 h-7 p-1 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-300 rounded-md border border-slate-700 cursor-pointer transition-colors flex items-center justify-center shrink-0"
                             title={`Direct Print KOT #${kot.kotNumber} to Kitchen Printer`}
@@ -1301,6 +1525,305 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* TAB 3: PENDING KOT PRINT QUEUE VIEW */}
+      {activeTab === 'queue' && (
+        <div
+          id="pending-kot-print-queue-view"
+          className="flex flex-col flex-1 gap-3 overflow-hidden"
+        >
+          {/* Queue Summary & Action Header */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
+            <div className="bg-slate-900 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                  Pending Print KOTs
+                </div>
+                <div className="text-2xl font-black text-white mt-0.5 font-mono">
+                  {pendingPrintKots.length}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {totalPendingPrintItemsCount} item(s) waiting for thermal print
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                <Printer className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                  Printed KOTs
+                </div>
+                <div className="text-2xl font-black text-white mt-0.5 font-mono">
+                  {printedQueueKots.length}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Dispatched to kitchen thermal printer
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Batch Thermal Dispatch
+                </span>
+                <span className="text-[10px] font-mono text-amber-300">
+                  {pendingPrintKots.length > 0 ? 'Ready to print' : 'Queue clear'}
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={pendingPrintKots.length === 0 || batchPrintingQueue}
+                onClick={handlePrintAllPendingKots}
+                className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 text-slate-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-md"
+              >
+                <Printer className="w-4 h-4" />
+                <span>
+                  {batchPrintingQueue
+                    ? 'Printing Queue...'
+                    : `Print All Pending (${pendingPrintKots.length})`}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Bar for Print Status (Pending / Printed / All) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800 text-xs shrink-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <span className="text-slate-400 font-bold px-1.5 text-xs flex items-center gap-1 shrink-0">
+                <Filter className="w-3.5 h-3.5 text-amber-400" /> Queue Status:
+              </span>
+              {[
+                {
+                  id: 'PENDING' as const,
+                  label: 'Pending Print',
+                  count: pendingPrintKots.length
+                },
+                {
+                  id: 'PRINTED' as const,
+                  label: 'Printed',
+                  count: printedQueueKots.length
+                },
+                {
+                  id: 'ALL' as const,
+                  label: 'All KOTs (Pending & Printed)',
+                  count: kotPrintQueue.length
+                }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setQueueFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 shrink-0 ${
+                    queueFilter === tab.id
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                      : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                      queueFilter === tab.id
+                        ? 'bg-slate-950/20 text-slate-950'
+                        : 'bg-slate-900 text-slate-300'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Queue Cards List */}
+          <div className="flex-1 overflow-y-auto pr-1">
+            {filteredPrintQueue.length === 0 ? (
+              <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400 text-center p-8 space-y-2.5 bg-slate-900/40 rounded-xl border border-slate-800">
+                <CheckCircle2 className="w-12 h-12 text-emerald-500/70 stroke-1" />
+                <div>
+                  <p className="font-bold text-sm text-slate-200">
+                    {queueFilter === 'PENDING'
+                      ? 'No Pending KOTs Waiting for Thermal Printing'
+                      : 'No KOTs in Selected Print Queue Filter'}
+                  </p>
+                  <p className="text-xs text-slate-500 max-w-md mt-1">
+                    {queueFilter === 'PENDING'
+                      ? 'All kitchen tickets have been printed. Orders created with "Send KOT Only" or queued items will automatically appear here.'
+                      : 'Switch the queue filter above or create a new KOT.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {filteredPrintQueue.map((entry) => {
+                  const { kot, items, isPending } = entry;
+                  const elapsed = getElapsedTimeInfo(kot.createdAt);
+                  const isCurrentlyPrinting = printingKotId === kot.id;
+
+                  return (
+                    <div
+                      key={kot.id}
+                      className={`bg-slate-900 border rounded-xl p-3.5 flex flex-col justify-between gap-3 shadow-md transition-all ${
+                        isPending
+                          ? 'border-amber-500/60 shadow-amber-950/20'
+                          : 'border-emerald-500/30 bg-slate-900/90'
+                      }`}
+                    >
+                      <div>
+                        {/* Header Row */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-base font-black text-amber-400">
+                                {kot.kotNumber}
+                              </span>
+                              <span className="bg-slate-950 px-2 py-0.5 rounded border border-slate-700 font-black text-white text-xs">
+                                {kot.tableNumber || 'Take Away'}
+                              </span>
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] uppercase font-black px-2 py-0.5 rounded-full border tracking-wider ${
+                                  isPending
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse'
+                                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                }`}
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>{isPending ? 'PENDING PRINT' : 'PRINTED'}</span>
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 font-mono">
+                              <span>Waiter: {kot.waiterName || 'Staff'}</span>
+                              <span>•</span>
+                              <span>{elapsed.text}</span>
+                              {kot.printedAt && !isPending && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-emerald-400">
+                                    Printed{' '}
+                                    {new Date(kot.printedAt).toLocaleTimeString([], {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Items Table with Per-Item Pending/Printed Status */}
+                        <div className="mt-3 bg-slate-950/90 p-2.5 rounded-lg border border-slate-800 space-y-2 text-xs font-mono max-h-52 overflow-y-auto">
+                          <div className="flex justify-between text-[10px] text-slate-400 font-sans uppercase font-bold border-b border-slate-800 pb-1">
+                            <span>Item & Thermal Status</span>
+                            <span>Qty</span>
+                          </div>
+                          {items.map((itm, idx) => {
+                            const itemPending =
+                              itm.printStatus === 'PENDING' ||
+                              (isPending && itm.printStatus !== 'PRINTED');
+                            return (
+                              <div
+                                key={itm.id || idx}
+                                className="flex items-start justify-between gap-2 border-b border-slate-900 pb-1.5 last:border-0 last:pb-0"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-slate-100 text-xs">
+                                      {idx + 1}. {itm.itemName}
+                                    </span>
+                                    <span
+                                      className={`text-[9px] font-sans font-extrabold uppercase px-1.5 py-0.2 rounded border ${
+                                        itemPending
+                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                      }`}
+                                    >
+                                      {itemPending ? 'Pending' : 'Printed'}
+                                    </span>
+                                  </div>
+                                  {itm.notes && (
+                                    <div className="text-[10px] text-amber-300 font-sans mt-0.5">
+                                      ⚡ {itm.notes}
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="font-black text-amber-400 text-sm bg-slate-900 px-2 py-0.5 rounded border border-slate-800 shrink-0">
+                                  ×{itm.quantity}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Queue Card Footer Controls */}
+                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewKotData({ kot, items });
+                              setIsKotModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Preview Thermal KOT Slip"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Preview</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSetKotPrintStatus(
+                                kot,
+                                items,
+                                isPending ? 'PRINTED' : 'PENDING',
+                                false
+                              )
+                            }
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold cursor-pointer transition-colors"
+                          >
+                            {isPending ? 'Mark Printed' : 'Re-queue Pending'}
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isCurrentlyPrinting}
+                          onClick={() =>
+                            handleSetKotPrintStatus(kot, items, 'PRINTED', true)
+                          }
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs ${
+                            isPending
+                              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          }`}
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>
+                            {isCurrentlyPrinting
+                              ? 'Printing...'
+                              : isPending
+                              ? 'Print KOT Now'
+                              : 'Reprint KOT'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

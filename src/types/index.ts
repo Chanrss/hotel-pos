@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'manager' | 'waiter' | 'OWNER' | 'MANAGER' | 'WAITER';
+export type UserRole = 'admin' | 'owner' | 'manager' | 'waiter' | 'ADMIN' | 'OWNER' | 'MANAGER' | 'WAITER';
 
 export interface AppUser {
   uid: string;
@@ -8,6 +8,8 @@ export interface AppUser {
   pin?: string;
   roleId: string;
   active: boolean;
+  fullAccess?: boolean;
+  permissions?: string[];
   createdAt: number;
   updatedAt: number;
   lastLoginAt?: number;
@@ -59,6 +61,7 @@ export type PriceType = 'NON_AC' | 'AC';
 export type OrderType = 'DINE_IN' | 'TAKE_AWAY';
 
 export type KotStatus = 'OPEN' | 'SENT' | 'PREPARING' | 'READY' | 'COMPLETED' | 'BILLED' | 'CANCELLED';
+export type KotPrintStatus = 'PENDING' | 'PRINTED';
 
 export interface KotItem {
   id: string;
@@ -71,6 +74,8 @@ export interface KotItem {
   priceType: PriceType;
   unitPrice?: number;
   notes?: string;
+  printStatus?: KotPrintStatus;
+  printedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -84,6 +89,9 @@ export interface Kot {
   waiterId: string;
   waiterName?: string;
   status: KotStatus;
+  printStatus?: KotPrintStatus;
+  printedAt?: number;
+  printCount?: number;
   items?: KotItem[];
   itemsCount?: number;
   createdBy: string;
@@ -541,4 +549,31 @@ export type NavTab =
   | 'reports' 
   | 'users' 
   | 'settings';
+
+export type UserActivityAction =
+  | 'User Registered'
+  | 'Role Updated'
+  | 'Access Updated'
+  | 'PIN Updated'
+  | 'Status Changed'
+  | 'User Deleted'
+  | 'Staff Reset';
+
+export interface UserActivityLog {
+  id: string;
+  action: UserActivityAction | string;
+  targetUserId: string;
+  targetUserName: string;
+  targetUsername: string;
+  targetRole: string;
+  performedByUid: string;
+  performedByName: string;
+  performedByUsername: string;
+  details: string;
+  previousValue?: string;
+  newValue?: string;
+  timestamp: number;
+  createdAt: string;
+}
+
 

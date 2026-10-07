@@ -235,67 +235,67 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // RBAC-filtered Navigation Options
+  // RBAC-filtered Navigation Options (Full access controlled by Admin account)
   const navItems = [
     {
       id: 'dashboard' as NavTab,
       label: 'Dashboard',
       icon: LayoutDashboard,
-      show: isOwner || isManager || hasPermission('dashboard.view')
+      show: isOwner || hasPermission('dashboard.view')
     },
     {
       id: 'pos' as NavTab,
       label: 'POS Billing',
       icon: ShoppingBag,
-      show: true
+      show: isOwner || hasPermission('pos.view') || hasPermission('billing.create')
     },
     {
       id: 'direct-billing' as NavTab,
       label: 'Direct Billing',
       icon: Zap,
-      show: true
+      show: isOwner || hasPermission('direct-billing.view') || hasPermission('billing.create')
     },
     {
       id: 'kot' as NavTab,
       label: 'KOT',
       icon: ChefHat,
-      show: true
+      show: isOwner || hasPermission('kot.view') || hasPermission('kot.create')
     },
     {
       id: 'running-kot' as NavTab,
       label: 'Running KOTs',
       icon: Flame,
-      show: true
+      show: isOwner || hasPermission('kot.view') || hasPermission('kot.edit')
     },
     {
       id: 'reprint' as NavTab,
       label: 'Orders',
       icon: Receipt,
-      show: true
+      show: isOwner || hasPermission('billing.reprint') || hasPermission('billing.print')
     },
     {
       id: 'menu' as NavTab,
       label: 'Menu',
       icon: Utensils,
-      show: isOwner || isManager || hasPermission('menu.view')
+      show: isOwner || hasPermission('menu.view')
     },
     {
       id: 'inventory' as NavTab,
       label: 'Inventory',
       icon: Boxes,
-      show: isOwner || isManager || hasPermission('inventory.view')
+      show: isOwner || hasPermission('inventory.view')
     },
     {
       id: 'reports' as NavTab,
       label: 'Reports',
       icon: BarChart3,
-      show: isOwner || isManager || hasPermission('reports.view')
+      show: isOwner || hasPermission('reports.view')
     },
     {
       id: 'users' as NavTab,
-      label: 'Users',
+      label: 'Admin',
       icon: Users,
-      show: isOwner || hasPermission('users.manage')
+      show: isOwner
     },
     {
       id: 'settings' as NavTab,
@@ -425,11 +425,13 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
-          {/* Current User & Role Badge */}
+          {/* Current User & Role Badge (Click to Switch User with Username & PIN) */}
           {currentUser && (
-            <div
-              className="hidden sm:flex items-center gap-1.5 h-6 px-2 rounded bg-slate-900 border border-slate-800 text-2xs shrink-0"
-              title={`User: ${currentUser.name || currentUser.email} (${roleLabel})`}
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="hidden sm:flex items-center gap-1.5 h-6 px-2 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-2xs shrink-0 cursor-pointer transition-colors"
+              title={`Logged in as ${currentUser.name || currentUser.username} (${roleLabel}) — Click to switch user`}
             >
               <UserCheck className="w-3 h-3 text-amber-400 shrink-0" />
               <span className="font-semibold text-slate-200 truncate max-w-[90px]">
@@ -438,7 +440,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-[10px]">
                 {roleLabel}
               </span>
-            </div>
+            </button>
           )}
 
           {/* Fullscreen Toggle */}
@@ -453,7 +455,17 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Auth Action */}
-          {firebaseUser ? (
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="h-6 px-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0"
+            title="Staff Login (Username & PIN)"
+          >
+            <LogIn className="w-3 h-3" />
+            <span className="hidden xs:inline">Login</span>
+          </button>
+
+          {currentUser && (
             <button
               type="button"
               onClick={logout}
@@ -461,16 +473,6 @@ export const Header: React.FC<HeaderProps> = ({
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onOpenAuth}
-              className="h-6 px-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0"
-              title="Staff Sign In"
-            >
-              <LogIn className="w-3 h-3" />
-              <span className="hidden xs:inline">Login</span>
             </button>
           )}
         </div>

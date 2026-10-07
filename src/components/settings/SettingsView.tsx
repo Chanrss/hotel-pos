@@ -17,7 +17,9 @@ import {
   Layers,
   Store,
   Minus,
-  Plus
+  Plus,
+  LayoutTemplate,
+  Eye
 } from 'lucide-react';
 import { RestaurantSettings } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
@@ -34,14 +36,24 @@ interface SettingsViewProps {
 
 type AlignOption = 'left' | 'center' | 'right';
 
-const FONT_SIZE_OPTIONS = [10, 11, 12, 13, 14] as const;
+const FONT_SIZE_MIN = 8;
+const FONT_SIZE_MAX = 20;
+const FONT_SIZE_OPTIONS = [10, 11, 12, 13, 14, 16, 18] as const;
 
 const FONT_SIZE_LABELS: Record<number, string> = {
-  10: 'Small (10)',
-  11: 'Compact (11)',
-  12: 'Normal (12)',
-  13: 'Medium (13)',
-  14: 'Large (14)'
+  8: 'Extra Small (8px)',
+  9: 'Mini (9px)',
+  10: 'Small (10px)',
+  11: 'Compact (11px)',
+  12: 'Normal (12px)',
+  13: 'Medium (13px)',
+  14: 'Large (14px)',
+  15: 'Extra Large (15px)',
+  16: 'XL Bold (16px)',
+  17: 'XXL (17px)',
+  18: 'Jumbo (18px)',
+  19: 'Max (19px)',
+  20: 'Ultra (20px)'
 };
 
 /**
@@ -93,6 +105,7 @@ async function optimizeLogoForThermalReceipt(file: File): Promise<string> {
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSettings, onRefreshSettings }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const firebaseSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mobilePreviewPinned, setMobilePreviewPinned] = useState(false);
 
   const buildSanitizedSettingsPayload = (raw: RestaurantSettings): RestaurantSettings => {
     const isLogoRemoved = Boolean(raw.logoRemoved);
@@ -115,8 +128,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       logoOffsetY: typeof raw.logoOffsetY === 'number' && !Number.isNaN(raw.logoOffsetY) ? Math.round(raw.logoOffsetY) : 0,
       receiptHeader: raw.receiptHeader || 'SRI SARAVANA BHAVAN',
       receiptFooter: raw.receiptFooter || 'THANK YOU',
-      paperWidth: '80mm',
-      receiptFontSize: raw.receiptFontSize ? Math.max(10, Math.min(14, Number(raw.receiptFontSize))) : 12,
+      paperWidth: raw.paperWidth === '58mm' ? '58mm' : '80mm',
+      receiptFontSize: raw.receiptFontSize ? Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, Number(raw.receiptFontSize))) : 12,
       receiptAlignment: defaultAlign,
       logoAlignment: raw.logoAlignment || defaultAlign,
       shopNameAlignment: raw.shopNameAlignment || defaultAlign,
@@ -132,15 +145,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       watermarkEnabled: raw.watermarkEnabled !== undefined ? Boolean(raw.watermarkEnabled) : true,
       watermarkUseLogo: raw.watermarkUseLogo !== undefined ? Boolean(raw.watermarkUseLogo) : true,
       watermarkOpacity: typeof raw.watermarkOpacity === 'number' ? raw.watermarkOpacity : 0.12,
-      receiptLogoMaxWidth: raw.receiptLogoMaxWidth || 100,
+      receiptLogoMaxWidth: raw.receiptLogoMaxWidth || 155,
       receiptLogoMaxHeight: raw.receiptLogoMaxHeight || 65,
       logoDisplay: isLogoRemoved ? 'none' : ((raw.watermarkEnabled !== false) ? 'watermark' : 'none'),
-      compactMode: false,
+      compactMode: Boolean(raw.compactMode),
+      receiptFormat: raw.compactMode ? 'compact' : (raw.receiptFormat || 'standard'),
+      receiptShowAddress: raw.receiptShowAddress !== false,
+      receiptShowPhone: raw.receiptShowPhone !== false,
+      receiptShowItemSl: raw.receiptShowItemSl !== false,
+      receiptShowTotalQty: raw.receiptShowTotalQty !== false,
       autoPrintOnSave: true,
       updatedAt: Date.now()
     };
 
-    // Strip any undefined keys so Firestore setDoc never rejects the document
     const cleanEntries = Object.entries(payload).filter(([_, value]) => value !== undefined);
     return Object.fromEntries(cleanEntries) as RestaurantSettings;
   };
@@ -178,8 +195,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       logoOffsetY: typeof merged.logoOffsetY === 'number' ? merged.logoOffsetY : 0,
       receiptHeader: merged.receiptHeader || 'SRI SARAVANA BHAVAN',
       receiptFooter: merged.receiptFooter || 'THANK YOU',
-      paperWidth: '80mm',
-      receiptFontSize: merged.receiptFontSize ? Math.max(10, Math.min(14, Number(merged.receiptFontSize))) : 12,
+      paperWidth: merged.paperWidth === '58mm' ? '58mm' : '80mm',
+      receiptFontSize: merged.receiptFontSize ? Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, Number(merged.receiptFontSize))) : 12,
       receiptAlignment: defaultAlign,
       logoAlignment: merged.logoAlignment || defaultAlign,
       shopNameAlignment: merged.shopNameAlignment || defaultAlign,
@@ -195,10 +212,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       watermarkEnabled: merged.watermarkEnabled !== undefined ? merged.watermarkEnabled : true,
       watermarkUseLogo: merged.watermarkUseLogo !== undefined ? merged.watermarkUseLogo : true,
       watermarkOpacity: merged.watermarkOpacity !== undefined ? merged.watermarkOpacity : 0.12,
-      receiptLogoMaxWidth: merged.receiptLogoMaxWidth || 100,
+      receiptLogoMaxWidth: merged.receiptLogoMaxWidth || 155,
       receiptLogoMaxHeight: merged.receiptLogoMaxHeight || 65,
       logoDisplay: isLogoRemoved ? 'none' : ((merged.watermarkEnabled !== false) ? 'watermark' : 'none'),
-      compactMode: false,
+      compactMode: Boolean(merged.compactMode),
+      receiptFormat: merged.compactMode ? 'compact' : (merged.receiptFormat || 'standard'),
+      receiptShowAddress: merged.receiptShowAddress !== false,
+      receiptShowPhone: merged.receiptShowPhone !== false,
+      receiptShowItemSl: merged.receiptShowItemSl !== false,
+      receiptShowTotalQty: merged.receiptShowTotalQty !== false,
       autoPrintOnSave: true,
       updatedAt: Date.now()
     };
@@ -211,7 +233,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
     message?: string;
   }>({ state: 'idle' });
 
-  // Simple Diagnostic Status State (Requirement 15) backed by centralized PrintService
   const [diagState, setDiagState] = useState(() => PrintService.getDiagnosticStatus());
 
   useEffect(() => {
@@ -243,7 +264,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           logoOffsetX: typeof initialSettings.logoOffsetX === 'number' ? initialSettings.logoOffsetX : (prev.logoOffsetX || 0),
           logoOffsetY: typeof initialSettings.logoOffsetY === 'number' ? initialSettings.logoOffsetY : (prev.logoOffsetY || 0),
           receiptFontSize: initialSettings.receiptFontSize
-            ? Math.max(10, Math.min(14, Number(initialSettings.receiptFontSize)))
+            ? Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, Number(initialSettings.receiptFontSize)))
             : (prev.receiptFontSize || 12),
           logoAlignment: initialSettings.logoAlignment || prev.logoAlignment || defaultAlign,
           shopNameAlignment: initialSettings.shopNameAlignment || prev.shopNameAlignment || defaultAlign,
@@ -275,6 +296,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
     try {
       localStorage.setItem('pos_restaurant_settings', JSON.stringify(synced));
       window.dispatchEvent(new CustomEvent('pos-settings-updated', { detail: synced }));
+      const printRoot = document.getElementById('pos-print-root');
+      if (printRoot && synced.receiptFontSize) {
+        printRoot.style.setProperty('--receipt-base-font-size', `${synced.receiptFontSize}px`);
+      }
     } catch (_) {}
 
     if (firebaseSyncTimerRef.current) {
@@ -284,7 +309,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       setDoc(doc(db, 'settings', 'restaurant'), synced, { merge: true }).catch(() => {
         // Offline / sandbox fallback already cached in localStorage
       });
-    }, 300);
+    }, 250);
   };
 
   useEffect(() => {
@@ -376,7 +401,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       setNotification({ type: 'success', message: 'Receipt & Printer Settings saved to Firebase!' });
       setTimeout(() => setNotification(null), 3000);
     } catch (_) {
-      // Even if Firestore is offline, settings are saved in localStorage
       setNotification({ type: 'success', message: 'Receipt settings saved locally!' });
       setTimeout(() => setNotification(null), 3000);
     } finally {
@@ -384,7 +408,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
     }
   };
 
-  // TEST PRINT handler via centralized PrintService (Requirements 10, 14, 15)
+  // TEST PRINT handler via centralized PrintService
   const handleTestPrint = async () => {
     setTestPrintStatus({ state: 'printing', message: 'Printing...' });
 
@@ -413,7 +437,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
     }
   };
 
-  const currentFontSize = Math.max(10, Math.min(14, Number(formData.receiptFontSize || 12)));
+  const currentFontSize = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, Number(formData.receiptFontSize || 12)));
   const hasLogo = !formData.logoRemoved && Boolean(formData.logoUrl?.trim());
 
   const alignmentRows: {
@@ -446,11 +470,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 p-3 sm:p-5 gap-4 overflow-y-auto">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-100 p-3 sm:p-4 gap-3.5 overflow-y-auto md:overflow-hidden">
       {/* Top Bar */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg">
+      <div className="bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+          <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
             <Printer className="w-5 h-5" />
           </div>
           <div>
@@ -458,18 +482,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
               Printer &amp; Receipt Settings
             </h2>
             <p className="text-xs text-slate-400">
-              Simple 3-inch thermal receipt appearance, logo position, watermark &amp; test printing
+              Real-time 3-inch thermal receipt layout, alignment, watermark positioning &amp; test printing
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 ml-auto">
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={() => setMobilePreviewPinned((v) => !v)}
+            className="md:hidden px-3 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+          >
+            <Eye className="w-4 h-4 text-emerald-400" />
+            <span>{mobilePreviewPinned ? 'Hide Preview' : 'Pin Preview'}</span>
+          </button>
+
           <button
             type="button"
             id="btn-header-test-print"
             onClick={handleTestPrint}
             disabled={testPrintStatus.state === 'printing'}
-            className="px-4 py-2 text-xs sm:text-sm font-bold text-amber-300 hover:text-amber-200 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-300 hover:text-amber-200 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <Printer className="w-4 h-4 text-amber-400" />
             <span>{testPrintStatus.state === 'printing' ? 'Printing...' : 'TEST PRINT'}</span>
@@ -490,7 +523,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       {/* Notification Banner */}
       {notification && (
         <div
-          className={`px-4 py-3 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2.5 shadow-md ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2.5 shadow-md shrink-0 ${
             notification.type === 'success'
               ? 'bg-emerald-950/90 border border-emerald-500/40 text-emerald-200'
               : 'bg-red-950/90 border border-red-500/40 text-red-200'
@@ -505,20 +538,190 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
         </div>
       )}
 
-      {/* Main Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Column: Simple Receipt & Printer Controls (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          {/* 1. FONT SIZE */}
+      {/* Optional Mobile Pinned Live Receipt Preview (< 768px) */}
+      {mobilePreviewPinned && (
+        <div className="md:hidden shrink-0">
+          <LiveReceiptPreview
+            settings={formData}
+            onUpdateLogoPosition={(offsetX, offsetY) =>
+              updateSettingsImmediate((prev) => ({
+                ...prev,
+                logoOffsetX: offsetX,
+                logoOffsetY: offsetY
+              }))
+            }
+            onResetLogoPosition={handleResetLogoPosition}
+            onTestPrint={handleTestPrint}
+            isPrintingSample={testPrintStatus.state === 'printing'}
+            testPrintStatus={testPrintStatus}
+          />
+        </div>
+      )}
+
+      {/* Persistent Split-Pane Workspace: Left Scrollable Controls + Right Persistent Preview Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:flex-1 md:min-h-0 md:overflow-hidden">
+        {/* Left Column: Receipt & Printer Controls (7 cols, independently scrollable) */}
+        <div className="md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto md:pr-1.5 pb-6">
+          {/* 1. RECEIPT LAYOUT & DENSITY */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
-                <Type className="w-4 h-4 text-amber-400" />
-                <h3 className="font-bold text-sm text-white">Font Size</h3>
+                <LayoutTemplate className="w-4 h-4 text-amber-400" />
+                <h3 className="font-bold text-sm text-white">Receipt Layout &amp; Sections</h3>
               </div>
-              <span className="text-xs font-mono text-amber-400 font-bold">
-                {FONT_SIZE_LABELS[currentFontSize] || `Normal (${currentFontSize})`}
+              <span className="text-xs font-mono text-emerald-400 font-bold">
+                {formData.compactMode ? 'Compact Paper-Saver' : 'Standard 3-Inch'}
               </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    compactMode: false,
+                    receiptFormat: 'standard'
+                  }))
+                }
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  !formData.compactMode
+                    ? 'bg-amber-500/15 border-amber-500 text-white'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="font-bold text-xs text-white">Standard Layout</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Balanced spacing &amp; full readability
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    compactMode: true,
+                    receiptFormat: 'compact'
+                  }))
+                }
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  formData.compactMode
+                    ? 'bg-emerald-500/15 border-emerald-500 text-white'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="font-bold text-xs text-white">Compact Paper-Saver</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Tighter line spacing to save roll paper
+                </div>
+              </button>
+            </div>
+
+            {/* Section Visibility Checkboxes */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              {(
+                [
+                  { key: 'receiptShowAddress', label: 'Address' },
+                  { key: 'receiptShowPhone', label: 'Phone' },
+                  { key: 'receiptShowItemSl', label: 'Item Sl (#)' },
+                  { key: 'receiptShowTotalQty', label: 'Total Qty' }
+                ] as const
+              ).map((sec) => {
+                const checked = formData[sec.key] !== false;
+                return (
+                  <label
+                    key={sec.key}
+                    className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border text-xs font-semibold cursor-pointer select-none transition-colors ${
+                      checked
+                        ? 'bg-slate-950 border-amber-500/50 text-white'
+                        : 'bg-slate-950/50 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        updateSettingsImmediate((prev) => ({
+                          ...prev,
+                          [sec.key]: e.target.checked
+                        }))
+                      }
+                      className="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer"
+                    />
+                    <span className="truncate">{sec.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. FONT SIZE (Dynamic Firestore Slider + Stepper + Quick Presets) */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Type className="w-4 h-4 text-amber-400" />
+                <div>
+                  <h3 className="font-bold text-sm text-white">Receipt Font Size</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Slide to adjust thermal receipt text size visually in real-time
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs font-mono text-amber-300 font-bold">
+                {FONT_SIZE_LABELS[currentFontSize] || `${currentFontSize}px`}
+              </span>
+            </div>
+
+            {/* Interactive Range Slider for receiptFontSize */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <label
+                  htmlFor="receipt-font-size-slider"
+                  className="font-semibold text-slate-300 flex items-center gap-1.5"
+                >
+                  <span>Text Size Slider</span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    ({FONT_SIZE_MIN}px – {FONT_SIZE_MAX}px)
+                  </span>
+                </label>
+                <span className="font-mono font-bold text-amber-400 text-sm">
+                  {currentFontSize}px
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-mono text-slate-400 select-none">A</span>
+                <input
+                  id="receipt-font-size-slider"
+                  data-testid="receipt-font-size-slider"
+                  type="range"
+                  min={FONT_SIZE_MIN}
+                  max={FONT_SIZE_MAX}
+                  step={1}
+                  value={currentFontSize}
+                  aria-label="Receipt Font Size"
+                  onChange={(e) => {
+                    const nextSize = Math.max(
+                      FONT_SIZE_MIN,
+                      Math.min(FONT_SIZE_MAX, Number(e.target.value))
+                    );
+                    updateSettingsImmediate((prev) => ({
+                      ...prev,
+                      receiptFontSize: nextSize
+                    }));
+                  }}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+                <span className="text-base font-mono font-bold text-slate-200 select-none">A</span>
+              </div>
+
+              <div className="flex justify-between text-[10px] font-mono text-slate-400 px-1">
+                <span>8px (Small)</span>
+                <span>12px (Default)</span>
+                <span>16px (Large)</span>
+                <span>20px (Max)</span>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -529,27 +732,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
                   onClick={() =>
                     updateSettingsImmediate((prev) => ({
                       ...prev,
-                      receiptFontSize: Math.max(10, Number(prev.receiptFontSize || 12) - 1)
+                      receiptFontSize: Math.max(FONT_SIZE_MIN, Number(prev.receiptFontSize || 12) - 1)
                     }))
                   }
-                  disabled={currentFontSize <= 10}
+                  disabled={currentFontSize <= FONT_SIZE_MIN}
                   className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-bold flex items-center justify-center cursor-pointer transition-colors"
                   title="Decrease Font Size"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="px-3 text-xs font-bold text-white min-w-[90px] text-center">
-                  {FONT_SIZE_LABELS[currentFontSize] || 'Normal'}
+                <span className="px-3 text-xs font-bold text-white min-w-[96px] text-center">
+                  {FONT_SIZE_LABELS[currentFontSize] || `${currentFontSize}px`}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
                     updateSettingsImmediate((prev) => ({
                       ...prev,
-                      receiptFontSize: Math.min(14, Number(prev.receiptFontSize || 12) + 1)
+                      receiptFontSize: Math.min(FONT_SIZE_MAX, Number(prev.receiptFontSize || 12) + 1)
                     }))
                   }
-                  disabled={currentFontSize >= 14}
+                  disabled={currentFontSize >= FONT_SIZE_MAX}
                   className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-bold flex items-center justify-center cursor-pointer transition-colors"
                   title="Increase Font Size"
                 >
@@ -557,8 +760,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
                 </button>
               </div>
 
-              {/* Direct Number Buttons: [ 10 ] [ 11 ] [ 12 ] [ 13 ] [ 14 ] */}
-              <div className="flex items-center gap-1.5">
+              {/* Direct Number Preset Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5">
                 {FONT_SIZE_OPTIONS.map((size) => (
                   <button
                     key={size}
@@ -582,7 +785,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             </div>
           </div>
 
-          {/* 2. SHOP LOGO & LOGO DRAGGER / POSITION */}
+          {/* 3. SHOP LOGO & WATERMARK POSITION */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
@@ -640,32 +843,77 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
               </div>
             </div>
 
-            {/* Logo Dragger / Position Controls */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-slate-300">
-                <Move className="w-4 h-4 text-amber-400 shrink-0" />
-                <div>
-                  <div className="font-semibold text-white">
-                    Drag logo inside the Receipt Preview to position it
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    Horizontal: {formData.logoOffsetX || 0}px · Vertical: {formData.logoOffsetY || 0}px
+            {/* Logo / Watermark Position Controls */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-slate-300">
+                  <Move className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-white">
+                      Drag watermark inside the Receipt Preview or use sliders
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      Horizontal: {formData.logoOffsetX || 0}px · Vertical: {formData.logoOffsetY || 0}px
+                    </div>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetLogoPosition}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Logo Position</span>
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetLogoPosition}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Logo Position</span>
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Horizontal Offset (X)</span>
+                    <span className="font-mono text-amber-400">{formData.logoOffsetX || 0}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-85"
+                    max="85"
+                    step="1"
+                    value={formData.logoOffsetX || 0}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        logoOffsetX: Number(e.target.value)
+                      }))
+                    }
+                    className="w-full accent-amber-500 cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Vertical Offset (Y)</span>
+                    <span className="font-mono text-amber-400">{formData.logoOffsetY || 0}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-45"
+                    max="45"
+                    step="1"
+                    value={formData.logoOffsetY || 0}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        logoOffsetY: Number(e.target.value)
+                      }))
+                    }
+                    className="w-full accent-amber-500 cursor-pointer"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* 3. WATERMARK */}
+          {/* 4. WATERMARK */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -715,28 +963,107 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             </div>
 
             {formData.watermarkEnabled && (
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-slate-300 font-medium">Use Shop Logo as Watermark</span>
-                <input
-                  type="checkbox"
-                  checked={formData.watermarkUseLogo !== false}
-                  onChange={(e) =>
-                    updateSettingsImmediate((prev) => ({
-                      ...prev,
-                      watermarkUseLogo: e.target.checked
-                    }))
-                  }
-                  className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                />
+              <div className="pt-2 border-t border-slate-800/80 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300 font-medium">Use Shop Logo as Watermark</span>
+                  <input
+                    type="checkbox"
+                    checked={formData.watermarkUseLogo !== false}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        watermarkUseLogo: e.target.checked
+                      }))
+                    }
+                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Watermark Opacity</span>
+                      <span className="font-mono text-amber-400">
+                        {Math.round((formData.watermarkOpacity ?? 0.12) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="0.30"
+                      step="0.01"
+                      value={formData.watermarkOpacity ?? 0.12}
+                      onChange={(e) =>
+                        updateSettingsImmediate((prev) => ({
+                          ...prev,
+                          watermarkOpacity: Number(e.target.value)
+                        }))
+                      }
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                      <span>Watermark Size</span>
+                      <span className="font-mono text-amber-400">
+                        {formData.receiptLogoMaxWidth || 155}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="90"
+                      max="200"
+                      step="5"
+                      value={formData.receiptLogoMaxWidth || 155}
+                      onChange={(e) =>
+                        updateSettingsImmediate((prev) => ({
+                          ...prev,
+                          receiptLogoMaxWidth: Number(e.target.value)
+                        }))
+                      }
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* 4. ALIGNMENT SETTINGS */}
+          {/* 5. ALIGNMENT SETTINGS */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2.5">
-              <AlignCenter className="w-4 h-4 text-amber-400" />
-              <h3 className="font-bold text-sm text-white">Alignment Settings</h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <AlignCenter className="w-4 h-4 text-amber-400" />
+                <h3 className="font-bold text-sm text-white">Alignment Settings</h3>
+              </div>
+              <div className="flex items-center gap-1 text-[11px]">
+                <span className="text-slate-400 mr-1">All:</span>
+                {(['left', 'center', 'right'] as const).map((al) => (
+                  <button
+                    key={al}
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptAlignment: al,
+                        logoAlignment: al,
+                        shopNameAlignment: al,
+                        addressAlignment: al,
+                        phoneAlignment: al,
+                        footerAlignment: al
+                      }))
+                    }
+                    className={`px-2 py-0.5 rounded uppercase font-bold cursor-pointer ${
+                      formData.receiptAlignment === al
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    {al}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="divide-y divide-slate-800/70">
@@ -783,7 +1110,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             </div>
           </div>
 
-          {/* 5. BOLD LETTERS */}
+          {/* 6. BOLD LETTERS */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2.5">
               <Bold className="w-4 h-4 text-amber-400" />
@@ -819,7 +1146,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             </div>
           </div>
 
-          {/* 6. SHOP RECEIPT HEADER & FOOTER DETAILS */}
+          {/* 7. SHOP RECEIPT HEADER & FOOTER DETAILS */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2.5">
               <Store className="w-4 h-4 text-amber-400" />
@@ -878,8 +1205,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           </div>
         </div>
 
-        {/* Right Column: Live 3-Inch Receipt Preview + Test Print + Print Diagnostic Status (5 cols) */}
-        <div className="lg:col-span-5 sticky top-4 flex flex-col gap-4">
+        {/* Right Column: Persistent Live 3-Inch Receipt Preview + Print Diagnostic Status (5 cols) */}
+        <div className="md:col-span-5 flex flex-col gap-4 md:h-full md:overflow-y-auto md:pl-1 pb-6">
           <LiveReceiptPreview
             settings={formData}
             onUpdateLogoPosition={(offsetX, offsetY) =>
@@ -895,7 +1222,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             testPrintStatus={testPrintStatus}
           />
 
-          {/* 15. SIMPLE PRINT DIAGNOSTIC STATUS */}
+          {/* SIMPLE PRINT DIAGNOSTIC STATUS */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-2.5 text-xs">
             <h4 className="font-bold text-slate-200 uppercase tracking-wider text-[11px] border-b border-slate-800 pb-2">
               Print Diagnostic Status

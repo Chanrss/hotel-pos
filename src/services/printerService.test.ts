@@ -278,7 +278,7 @@ describe('PrinterService thermal receipt formatting', () => {
     expect(html).toContain('--receipt-base-font-size: 13px;');
     expect(html).toContain('translate(25px, 12px)');
     expect(html).toContain('class="watermark-container"');
-    expect(html).toContain('align-left');
+    expect(html).toContain('text-align: left;');
     expect(html).toContain('text-align: right;');
   });
 
@@ -306,8 +306,8 @@ describe('PrinterService thermal receipt formatting', () => {
 
     const printRoot = document.getElementById('pos-print-root');
     expect(printRoot?.innerHTML).toContain('TEST-001');
-    expect(printRoot?.innerHTML).toContain('Rice');
-    expect(printRoot?.innerHTML).toContain('Juice');
+    expect(printRoot?.innerHTML).toContain('மசால் தோசை');
+    expect(printRoot?.innerHTML).toContain('ஃபில்டர் காபி');
   });
 
   it('queues and executes PrintService.printReceipt(data) and PrintService.testPrint() via direct ESC/POS without calling window.print() or window.open(), and retries failed jobs without duplicating bills', async () => {

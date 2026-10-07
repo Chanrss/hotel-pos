@@ -92,8 +92,8 @@ export class PrinterService {
     const isCompact = Boolean(settings?.compactMode) || settings?.receiptFormat === 'compact';
     const receiptFormat = settings?.receiptFormat || (isCompact ? 'compact' : 'standard');
     const configuredFontSize = settings?.receiptFontSize ? Number(settings.receiptFontSize) : (is58mm ? 10 : 12);
-    const clampedFontSize = Math.max(9, Math.min(16, configuredFontSize));
-    const baseFontSize = isCompact ? Math.max(9, Math.round(clampedFontSize * 0.92 * 10) / 10) : clampedFontSize;
+    const clampedFontSize = Math.max(8, Math.min(20, configuredFontSize));
+    const baseFontSize = isCompact ? Math.max(8, Math.round(clampedFontSize * 0.92 * 10) / 10) : clampedFontSize;
     const totalQty = items.reduce((sum, itm) => sum + itm.quantity, 0);
 
     const headerScaleMap = { normal: 1.35, large: 1.5, huge: 1.7 };
@@ -283,29 +283,33 @@ export class PrinterService {
       font-size: var(--receipt-title-font-size, ${titleFontSize}px); 
       font-weight: ${boldRestaurantName ? '800' : '400'}; 
       text-align: ${shopNameAlignment};
-      margin-bottom: 2px; 
+      margin-bottom: 1px; 
       letter-spacing: 0.2px;
-      line-height: 1.18;
+      line-height: 1.12;
     }
+    .restaurant-address,
     .address-section {
       font-size: var(--receipt-meta-font-size, ${metaFontSize}px);
       text-align: ${addressAlignment};
-      line-height: 1.02;
+      line-height: 0.96;
       color: #000;
+      margin-top: 0px;
       margin-bottom: 0px;
+      padding: 0;
     }
+    .restaurant-address div,
     .address-section div {
-      line-height: 1.02;
+      line-height: 0.96;
       margin: 0;
       padding: 0;
     }
     .phone-section {
       font-size: var(--receipt-meta-font-size, ${metaFontSize}px);
       text-align: ${phoneAlignment};
-      line-height: 1.05;
+      line-height: 1.02;
       color: #000;
-      margin-top: 1px;
-      margin-bottom: 1px;
+      margin-top: 0.5px;
+      margin-bottom: 0px;
     }
     .meta-section {
       margin: ${sectionSpacingVal};
@@ -420,7 +424,7 @@ export class PrinterService {
           ${hotelNameTamil}
         </div>
         ${showAddress ? `
-          <div class="address-section">
+          <div class="restaurant-address address-section">
             ${addressLines.map(line => `<div>${line}</div>`).join('')}
           </div>
         ` : ''}

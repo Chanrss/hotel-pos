@@ -15,11 +15,37 @@ import { DEFAULT_RESTAURANT_LOGO } from '../data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from '../services/brandLogoService';
 
 export const DEFAULT_PERMISSIONS = {
-  OWNER: [
+  ADMIN: [
     'dashboard.view',
+    'pos.view',
+    'direct-billing.view',
     'kot.create',
     'kot.edit',
     'kot.delete',
+    'kot.view',
+    'billing.create',
+    'billing.print',
+    'billing.reprint',
+    'billing.cancel',
+    'menu.view',
+    'menu.create',
+    'menu.edit',
+    'menu.price',
+    'inventory.view',
+    'inventory.edit',
+    'reports.view',
+    'reports.financial',
+    'users.manage',
+    'settings.manage'
+  ],
+  OWNER: [
+    'dashboard.view',
+    'pos.view',
+    'direct-billing.view',
+    'kot.create',
+    'kot.edit',
+    'kot.delete',
+    'kot.view',
     'billing.create',
     'billing.print',
     'billing.reprint',
@@ -37,9 +63,12 @@ export const DEFAULT_PERMISSIONS = {
   ],
   MANAGER: [
     'dashboard.view',
+    'pos.view',
+    'direct-billing.view',
     'kot.create',
     'kot.edit',
     'kot.delete',
+    'kot.view',
     'billing.create',
     'billing.print',
     'billing.reprint',
@@ -71,7 +100,13 @@ interface AuthContextType {
   register: (email: string, pass: string, name: string, roleId: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string, roleId: string) => Promise<void>;
   loginWithUsernameAndPin: (username: string, pin: string) => Promise<AppUser>;
-  registerWithUsernameAndPin: (username: string, pin: string, name: string, roleId: string) => Promise<AppUser>;
+  registerWithUsernameAndPin: (
+    username: string,
+    pin: string,
+    name: string,
+    roleId: string,
+    options?: { fullAccess?: boolean; permissions?: string[] }
+  ) => Promise<AppUser>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
@@ -151,17 +186,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await loadRole('owner');
         }
       } else {
+        if (localStorage.getItem('pos_logged_out') === 'true') {
+          setCurrentUser(null);
+          setCurrentRole(null);
+          setLoading(false);
+          return;
+        }
         const savedUserStr = localStorage.getItem('pos_logged_in_user');
         if (savedUserStr) {
           try {
             const savedUser = JSON.parse(savedUserStr) as AppUser;
             setCurrentUser(savedUser);
-            await loadRole(savedUser.roleId || 'owner');
+            await loadRole(savedUser.roleId || 'admin');
             setLoading(false);
             return;
           } catch (e) {}
         }
-        const savedDemoRole = (localStorage.getItem('pos_demo_role') as UserRole) || 'owner';
+        const savedDemoRole = (localStorage.getItem('pos_demo_role') as UserRole) || 'admin';
         applyDemoUser(savedDemoRole);
       }
       setLoading(false);
@@ -171,18 +212,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const applyDemoUser = (role: UserRole) => {
-    const lowerRole = role.toLowerCase() as 'owner' | 'manager' | 'waiter';
+    const rawLower = role.toLowerCase();
+    const lowerRole = (rawLower === 'admin' || rawLower === 'owner') ? 'admin' : rawLower as 'manager' | 'waiter';
     const names = {
-      owner: 'Hotel Owner (Full Access)',
+      admin: 'Admin',
       manager: 'Restaurant Manager',
       waiter: 'Floor Waiter'
     };
 
     const demoUser: AppUser = {
-      uid: `demo_${lowerRole}`,
-      name: names[lowerRole] || 'Staff User',
+      uid: `user_${lowerRole}`,
+      username: lowerRole,
+      name: names[lowerRole] || 'Admin',
       email: `${lowerRole}@hotelpos.local`,
       roleId: lowerRole,
+      fullAccess: lowerRole === 'admin',
       active: true,
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -192,7 +236,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setCurrentRole({
       id: lowerRole,
       name: lowerRole.toUpperCase(),
-      permissions: DEFAULT_PERMISSIONS[lowerRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] || [],
+      permissions: DEFAULT_PERMISSIONS[lowerRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] || DEFAULT_PERMISSIONS.ADMIN,
       active: true
     });
   };
@@ -331,12 +375,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const defaultStaff: AppUser[] = [
       {
+        uid: 'user_admin',
+        username: 'admin',
+        pin: '1234',
+        name: 'Admin',
+        email: 'admin@hotelpos.local',
+        roleId: 'admin',
+        fullAccess: true,
+        permissions: DEFAULT_PERMISSIONS.ADMIN,
+        active: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      },
+      {
         uid: 'user_owner',
         username: 'owner',
         pin: '1234',
-        name: 'Hotel Owner',
+        name: 'Admin',
         email: 'owner@hotelpos.local',
         roleId: 'owner',
+        fullAccess: true,
+        permissions: DEFAULT_PERMISSIONS.OWNER,
         active: true,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -348,6 +407,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name: 'Restaurant Manager',
         email: 'manager@hotelpos.local',
         roleId: 'manager',
+        fullAccess: false,
+        permissions: DEFAULT_PERMISSIONS.MANAGER,
         active: true,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -359,6 +420,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name: 'Counter Cashier',
         email: 'cashier@hotelpos.local',
         roleId: 'manager',
+        fullAccess: false,
+        permissions: DEFAULT_PERMISSIONS.MANAGER,
         active: true,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -370,6 +433,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name: 'Floor Waiter',
         email: 'waiter@hotelpos.local',
         roleId: 'waiter',
+        fullAccess: false,
+        permissions: DEFAULT_PERMISSIONS.WAITER,
         active: true,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -440,6 +505,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await setDoc(doc(db, 'users', updatedUser.uid), updatedUser, { merge: true });
       } catch (e) {}
 
+      localStorage.removeItem('pos_logged_out');
       localStorage.setItem('pos_logged_in_user', JSON.stringify(updatedUser));
       localStorage.setItem('pos_demo_role', updatedUser.roleId.toLowerCase());
       setCurrentUser(updatedUser);
@@ -454,16 +520,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     username: string,
     pin: string,
     name: string,
-    roleId: string
+    roleId: string,
+    options?: { fullAccess?: boolean; permissions?: string[] }
   ): Promise<AppUser> => {
+    const callerRole = currentUser?.roleId?.toLowerCase();
+    const callerIsAdmin = callerRole === 'admin' || callerRole === 'owner' || Boolean(currentUser?.fullAccess);
+    if (!callerIsAdmin) {
+      throw new Error('Only the Admin account can register new users.');
+    }
+
     setLoading(true);
     try {
       const cleanUser = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
       const cleanPin = pin.trim();
-      const cleanName = name.trim();
+      const cleanName = name.trim() || cleanUser;
 
-      if (!cleanName) throw new Error('Please enter staff full name.');
-      if (!cleanUser || cleanUser.length < 3) throw new Error('Username must be at least 3 alphanumeric characters.');
+      if (!cleanUser || cleanUser.length < 2) throw new Error('Username must be at least 2 alphanumeric characters.');
       if (!cleanPin || cleanPin.length < 4) throw new Error('PIN must be at least 4 digits.');
 
       const allStaff = await getKnownStaffList();
@@ -472,17 +544,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(`Username "${cleanUser}" is already taken. Please choose another.`);
       }
 
+      const normRole = roleId.toLowerCase();
+      const isNewUserAdmin = options?.fullAccess !== undefined
+        ? options.fullAccess
+        : (normRole === 'admin' || normRole === 'owner');
+      const defaultPerms =
+        options?.permissions ||
+        DEFAULT_PERMISSIONS[normRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] ||
+        DEFAULT_PERMISSIONS.WAITER;
+
       const newUser: AppUser = {
         uid: `user_${cleanUser}`,
         username: cleanUser,
         pin: cleanPin,
         name: cleanName,
         email: `${cleanUser}@hotelpos.local`,
-        roleId: roleId.toLowerCase(),
+        roleId: normRole,
+        fullAccess: isNewUserAdmin,
+        permissions: isNewUserAdmin ? DEFAULT_PERMISSIONS.ADMIN : defaultPerms,
         active: true,
         createdAt: Date.now(),
-        updatedAt: Date.now(),
-        lastLoginAt: Date.now()
+        updatedAt: Date.now()
       };
 
       try {
@@ -493,11 +575,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const currentLocals = allStaff.filter((u) => u.uid !== newUser.uid);
       localStorage.setItem('pos_local_users', JSON.stringify([...currentLocals, newUser]));
-      localStorage.setItem('pos_logged_in_user', JSON.stringify(newUser));
-      localStorage.setItem('pos_demo_role', newUser.roleId.toLowerCase());
-
-      setCurrentUser(newUser);
-      await loadRole(roleId);
       return newUser;
     } finally {
       setLoading(false);
@@ -506,28 +583,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     localStorage.removeItem('pos_logged_in_user');
+    localStorage.setItem('pos_logged_out', 'true');
     if (firebaseUser) {
       await fbSignOut(auth);
     }
-    applyDemoUser('owner');
+    setCurrentUser(null);
+    setCurrentRole(null);
   };
 
   const switchDemoRole = (role: UserRole) => {
+    localStorage.removeItem('pos_logged_out');
     localStorage.setItem('pos_demo_role', role.toLowerCase());
     applyDemoUser(role);
   };
 
+  const isOwner =
+    currentUser?.roleId?.toLowerCase() === 'owner' ||
+    currentUser?.roleId?.toLowerCase() === 'admin' ||
+    Boolean(currentUser?.fullAccess);
+  const isManager = currentUser?.roleId?.toLowerCase() === 'manager' || isOwner;
+  const isWaiter = currentUser?.roleId?.toLowerCase() === 'waiter' && !isOwner;
+
   const hasPermission = (perm: string): boolean => {
     if (!currentUser) return false;
-    const roleId = currentUser.roleId?.toLowerCase();
-    if (roleId === 'owner') return true; // Owner has unrestricted access
+    if (isOwner) return true; // Admin / Full Access account has unrestricted access
+    if (Array.isArray(currentUser.permissions)) {
+      if (currentUser.permissions.includes('all') || currentUser.permissions.includes(perm)) {
+        return true;
+      }
+      return false;
+    }
     if (!currentRole) return false;
     return currentRole.permissions.includes(perm);
   };
-
-  const isOwner = currentUser?.roleId?.toLowerCase() === 'owner';
-  const isManager = currentUser?.roleId?.toLowerCase() === 'manager' || isOwner;
-  const isWaiter = currentUser?.roleId?.toLowerCase() === 'waiter';
 
   /**
    * Initializes initial standard restaurant data (Categories, Menu items with codes, settings)

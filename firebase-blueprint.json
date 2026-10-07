@@ -246,6 +246,28 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["id", "itemCode", "itemName", "categoryIds", "acPrice", "nonAcPrice", "active"]
+    },
+    "UserActivityLog": {
+      "title": "UserActivityLog",
+      "description": "Audit log of administrative user management actions (User Registered, Role Updated, Access Updated, PIN Updated, Status Changed, User Deleted)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "targetUserId": { "type": "string" },
+        "targetUserName": { "type": "string" },
+        "targetUsername": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "performedByUid": { "type": "string" },
+        "performedByName": { "type": "string" },
+        "performedByUsername": { "type": "string" },
+        "details": { "type": "string" },
+        "previousValue": { "type": "string" },
+        "newValue": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "action", "targetUserId", "targetUserName", "performedByUid", "performedByName", "details", "timestamp", "createdAt"]
     }
   },
   "firestore": {
@@ -268,6 +290,10 @@
     "/daily_backups/{backupId}": {
       "schema": "DailyBackupRecord",
       "description": "Historical record of automated daily and manual billing database backups"
+    },
+    "/user_activity_logs/{logId}": {
+      "schema": "UserActivityLog",
+      "description": "Dedicated audit log collection recording user management actions, visible only to admins"
     }
   }
 }

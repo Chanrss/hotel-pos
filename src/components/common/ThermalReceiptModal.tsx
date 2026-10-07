@@ -423,19 +423,21 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                 <div className="font-extrabold text-[20px] sm:text-[22px] tracking-wide text-black leading-tight font-sans mb-0.5">
                   {hotelNameTamil}
                 </div>
-                <div className="text-[12px] sm:text-[12.5px] text-black leading-[1.02]">
+                <div className="restaurant-address address-section text-[12px] sm:text-[12.5px] text-black leading-[0.96] mb-0">
                   {addressLines.map((line, idx) => (
-                    <div key={idx} className="leading-[1.02] m-0 p-0">{line}</div>
+                    <div key={idx} className="leading-[0.96] m-0 p-0">{line}</div>
                   ))}
-                  <div className="leading-[1.05] mt-0.5">PH: {phone}</div>
-                  {(settings?.gstNumber || settings?.fssaiNumber) && (
-                    <div className="font-semibold text-slate-800 text-[10px] sm:text-[10.5px] leading-[1.05] mt-0.5">
-                      {settings?.gstNumber ? `GSTIN: ${settings.gstNumber}` : ''}
-                      {(settings?.gstNumber && settings?.fssaiNumber) ? ' | ' : ''}
-                      {settings?.fssaiNumber ? `FSSAI: ${settings.fssaiNumber}` : ''}
-                    </div>
-                  )}
                 </div>
+                <div className="phone-section text-[12px] sm:text-[12.5px] text-black leading-[1.02] mt-0.5 mb-0">
+                  PH: {phone}
+                </div>
+                {(settings?.gstNumber || settings?.fssaiNumber) && (
+                  <div className="font-semibold text-slate-800 text-[10px] sm:text-[10.5px] leading-[1.02] mt-0.5">
+                    {settings?.gstNumber ? `GSTIN: ${settings.gstNumber}` : ''}
+                    {(settings?.gstNumber && settings?.fssaiNumber) ? ' | ' : ''}
+                    {settings?.fssaiNumber ? `FSSAI: ${settings.fssaiNumber}` : ''}
+                  </div>
+                )}
               </div>
 
               {(isReprint || bill.reprintCount > 0) && (

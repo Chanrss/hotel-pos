@@ -161,6 +161,16 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser?.roleId]);
 
+  if (!currentUser) {
+    return (
+      <AuthModal
+        isOpen={true}
+        onClose={() => {}}
+        fullScreen={true}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] min-h-[100dvh] w-full bg-slate-100 text-slate-900 overflow-hidden font-sans">
       

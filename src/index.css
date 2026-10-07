@@ -266,7 +266,7 @@ body.pos-printing {
 
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .header { margin-bottom: 4px; }
+  .header { margin-bottom: 2px; }
   
   /* Centralized Bulletproof Receipt Logo Centering & Scaling */
   .receipt-logo-container {
@@ -347,19 +347,47 @@ body.pos-printing {
   .restaurant-title { 
     font-size: var(--receipt-title-font-size, 15px);
     font-weight: 900; 
-    margin-bottom: 2px; 
+    margin-bottom: 1px !important; 
+    line-height: 1.12 !important;
     letter-spacing: 0.5px;
     text-transform: uppercase; 
+  }
+  .restaurant-address,
+  .address-section {
+    font-size: var(--receipt-meta-font-size, 10.5px);
+    line-height: 0.96 !important;
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
+    padding-top: 0px !important;
+    padding-bottom: 0px !important;
+    color: #000;
+  }
+  .restaurant-address div,
+  .address-section div,
+  .restaurant-address p,
+  .address-section p {
+    line-height: 0.96 !important;
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
+    padding: 0 !important;
+  }
+  .phone-section {
+    font-size: var(--receipt-meta-font-size, 10.5px);
+    line-height: 1.02 !important;
+    margin-top: 0.5px !important;
+    margin-bottom: 0px !important;
+    color: #000;
   }
   .header-slogan {
     font-size: var(--receipt-header-font-size, 10.5px);
     font-weight: 600;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     font-style: italic;
   }
   .contact-info {
     font-size: var(--receipt-meta-font-size, 10px);
-    line-height: 1.35;
+    line-height: 1.05 !important;
+    margin-bottom: 0px !important;
     color: #222;
   }
   .tax-info {
@@ -447,8 +475,8 @@ body.pos-printing {
   .compact-mode .address-section,
   .receipt-compact .restaurant-address,
   .receipt-compact .address-section {
-    margin-bottom: 1px !important;
-    line-height: 1.12 !important;
+    margin-bottom: 0px !important;
+    line-height: 1.0 !important;
   }
   .compact-mode .bill-title,
   .receipt-compact .bill-title {
@@ -558,6 +586,24 @@ body.pos-printing {
 
 :not(.has-monochrome-logo):not([data-has-monochrome-logo="true"]) > .receipt-logo-monochrome:not(.monochrome-override):not([data-monochrome="true"]) {
   display: none;
+}
+
+.restaurant-address,
+.address-section {
+  line-height: 0.96 !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+}
+
+.restaurant-address div,
+.address-section div,
+.restaurant-address p,
+.address-section p {
+  line-height: 0.96 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Responsive KOT Display Grid for Mobile Devices & Kitchen Displays */

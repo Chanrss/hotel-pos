@@ -69,64 +69,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'dashboard' as NavTab,
       label: 'Dashboard',
       icon: LayoutDashboard,
-      show: isOwner || isManager || hasPermission('dashboard.view')
+      show: isOwner || hasPermission('dashboard.view')
     },
     {
       id: 'pos' as NavTab,
       label: 'POS Billing',
       badge: 'Full',
       icon: ShoppingBag,
-      show: true
+      show: isOwner || hasPermission('pos.view') || hasPermission('billing.create')
     },
     {
       id: 'direct-billing' as NavTab,
       label: 'Direct Billing',
       badge: 'Fast',
       icon: Zap,
-      show: true
+      show: isOwner || hasPermission('direct-billing.view') || hasPermission('billing.create')
     },
     {
       id: 'kot' as NavTab,
       label: 'KOT',
       icon: ChefHat,
-      show: true
+      show: isOwner || hasPermission('kot.view') || hasPermission('kot.create')
     },
     {
       id: 'running-kot' as NavTab,
       label: 'Running KOTs',
       badge: 'Live',
       icon: Flame,
-      show: true
+      show: isOwner || hasPermission('kot.view') || hasPermission('kot.edit')
     },
     {
       id: 'reprint' as NavTab,
       label: 'Orders',
       icon: Receipt,
-      show: true
+      show: isOwner || hasPermission('billing.reprint') || hasPermission('billing.print')
     },
     {
       id: 'menu' as NavTab,
       label: 'Menu',
       icon: Utensils,
-      show: isOwner || isManager || hasPermission('menu.view')
+      show: isOwner || hasPermission('menu.view')
     },
     {
       id: 'inventory' as NavTab,
       label: 'Inventory',
       icon: Boxes,
-      show: isOwner || isManager || hasPermission('inventory.view')
+      show: isOwner || hasPermission('inventory.view')
     },
     {
       id: 'reports' as NavTab,
       label: 'Reports',
       icon: BarChart3,
-      show: isOwner || isManager || hasPermission('reports.view')
+      show: isOwner || hasPermission('reports.view')
     },
     {
       id: 'users' as NavTab,
-      label: 'Users',
+      label: 'Admin',
       icon: Users,
-      show: isOwner || hasPermission('users.manage')
+      show: isOwner
     },
     {
       id: 'settings' as NavTab,
