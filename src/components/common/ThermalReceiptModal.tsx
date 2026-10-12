@@ -73,6 +73,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
     return 'watermark';
   });
   const [logoLoadError, setLogoLoadError] = useState(false);
+  const isSandboxed = typeof window !== 'undefined' && window.self !== window.top;
 
   useEffect(() => {
     if (isOpen) {
@@ -118,12 +119,26 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
       if (onPrint) {
         await onPrint();
       } else {
-        await PrintService.printReceipt({
-          bill,
-          items,
-          settings: effectiveSettings,
-          forcePrint: true
-        });
+        const isSandboxedCurrent = typeof window !== 'undefined' && window.self !== window.top;
+        if (isSandboxedCurrent && typeof PrinterService.openPrintableReceipt === 'function') {
+          const htmlReceipt = PrinterService.generateThermalReceiptHTML(bill, items, effectiveSettings);
+          const opened = PrinterService.openPrintableReceipt(htmlReceipt);
+          if (!opened) {
+            await PrintService.printReceipt({
+              bill,
+              items,
+              settings: effectiveSettings,
+              forcePrint: true
+            });
+          }
+        } else {
+          await PrintService.printReceipt({
+            bill,
+            items,
+            settings: effectiveSettings,
+            forcePrint: true
+          });
+        }
       }
     } catch (err) {
       console.error('Print trigger error:', err);
@@ -268,7 +283,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
           {(isPrinting || isPrintingLocal) && (
             <PrintingReceiptAnimation
               mode="modal-overlay"
-              isActive={true}
+              isActive={Boolean(isPrinting || isPrintingLocal)}
               bill={bill}
               items={items}
               settings={settings}
@@ -309,17 +324,35 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
         </div>
 
         {/* Hardware printer status bar */}
-        <div className="px-3.5 py-1.5 border-b text-xs flex items-center justify-between gap-2 shrink-0 bg-emerald-50/80 border-emerald-200 text-emerald-900">
+        <div className={`px-3.5 py-1.5 border-b text-xs flex items-center justify-between gap-2 shrink-0 ${
+          PrinterConnectionService.isDirectHardwareReady()
+            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+            : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+            ? 'bg-sky-50/90 border-sky-200 text-sky-900'
+            : 'bg-amber-50/90 border-amber-200 text-amber-900'
+        }`}>
           <div className="flex items-center gap-2 flex-1 truncate">
-            <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]" />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              PrinterConnectionService.isDirectHardwareReady()
+                ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]'
+                : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+                ? 'bg-sky-500'
+                : 'bg-amber-500 animate-pulse'
+            }`} />
             <span className="text-[11px] truncate">
-              Printer: <strong>Thermal Receipt Printer</strong> (USB / System)
+              {PrinterConnectionService.isDirectHardwareReady() ? (
+                <>Printer: <strong>{connectedPrinter.deviceName || 'Thermal Printer'}</strong> (Direct Hardware ESC/POS)</>
+              ) : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER' ? (
+                <>Printer: <strong>System Thermal Spooler</strong> (Browser / OS Default)</>
+              ) : (
+                <>Printer: <strong>No Hardware Paired</strong> (Click Hardware Setup)</>
+              )}
             </span>
           </div>
           <button
             type="button"
             onClick={() => setShowTroubleshoot(true)}
-            className="px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-colors shrink-0 text-emerald-800 hover:bg-emerald-100 underline"
+            className="px-2.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-colors shrink-0 underline hover:opacity-80"
           >
             Hardware Setup
           </button>
@@ -462,12 +495,12 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               {/* 3. Items Table: Item Number (#), Item Name in Tamil (BOLD, INCREASED SIZE), Qty (BOLD, INCREASED SIZE), Price (BOLD, INCREASED), Total (BOLD, INCREASED) */}
               <table className="w-full my-1 border-collapse table-fixed" style={{ tableLayout: 'fixed' }}>
                 <thead>
-                  <tr className="text-left text-black border-y border-black font-bold text-[13px] sm:text-[14px]">
-                    <th className="py-1 font-bold w-[8%] text-left whitespace-nowrap">#</th>
-                    <th className="py-1 pr-1 font-bold w-[44%] text-left break-words">பொருள்</th>
-                    <th className="py-1 text-right font-bold w-[14%] whitespace-nowrap">Qty</th>
-                    <th className="py-1 text-right font-bold w-[17%] whitespace-nowrap">Price</th>
-                    <th className="py-1 text-right font-bold w-[17%] whitespace-nowrap">Total</th>
+                  <tr className="text-left text-black border-y border-black font-black text-[15px] sm:text-[16px]">
+                    <th className="py-1 font-extrabold w-[8%] text-left whitespace-nowrap">#</th>
+                    <th className="py-1 pr-1 font-black w-[42%] text-left break-words">பொருள்</th>
+                    <th className="py-1 text-right font-black w-[16%] whitespace-nowrap">Qty</th>
+                    <th className="py-1 text-right font-black w-[17%] whitespace-nowrap">Price</th>
+                    <th className="py-1 text-right font-black w-[17%] whitespace-nowrap">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dotted divide-slate-300">
@@ -476,17 +509,17 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                     const displayName = tamilName || item.itemName;
                     return (
                       <tr key={idx} className="align-top">
-                        <td className="py-1 font-mono text-black text-left text-[13px] sm:text-[14px] whitespace-nowrap align-top">{idx + 1}</td>
+                        <td className="py-1 font-mono text-black text-left text-[14px] sm:text-[15px] whitespace-nowrap align-top">{idx + 1}</td>
                         <td className="py-1 pr-1 text-black leading-snug break-words align-top">
-                          <div className="font-black text-black font-sans text-[16px] sm:text-[17px] text-left break-words leading-tight">{displayName}</div>
+                          <div className="font-black text-black font-sans text-[18px] sm:text-[19px] text-left break-words leading-tight">{displayName}</div>
                         </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap align-top">
-                          {Number(item.quantity).toFixed(0)}
+                        <td className="py-1 text-right font-mono font-black text-black text-[18px] sm:text-[19px] whitespace-nowrap align-top">
+                          <b>{Number(item.quantity).toFixed(0)}</b>
                         </td>
-                        <td className="py-1 text-right font-mono text-black font-bold text-[14.5px] sm:text-[15.5px] whitespace-nowrap align-top">
+                        <td className="py-1 text-right font-mono text-black font-extrabold text-[16.5px] sm:text-[17.5px] whitespace-nowrap align-top">
                           {Number(item.unitPrice).toFixed(2)}
                         </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap align-top">
+                        <td className="py-1 text-right font-mono font-black text-black text-[17.5px] sm:text-[18.5px] whitespace-nowrap align-top">
                           {Number(item.totalPrice).toFixed(2)}
                         </td>
                       </tr>
@@ -496,13 +529,13 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               </table>
 
               {/* 4. Total Qty next to Item Total */}
-              <div className="space-y-0.5 text-[13.5px] sm:text-[14.5px] my-1 pt-1 border-t border-slate-300">
+              <div className="space-y-0.5 text-[15px] sm:text-[16px] my-1 pt-1 border-t border-slate-300">
                 <div className="flex justify-between items-center text-black font-bold whitespace-nowrap">
-                  <span className="whitespace-nowrap">Total Qty : <span className="font-mono font-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap">{totalQty.toFixed(0)}</span></span>
-                  <span className="whitespace-nowrap">Item Total : <span className="font-mono font-black text-[15.5px] sm:text-[16.5px] whitespace-nowrap">₹{Number(bill.subtotal).toFixed(2)}</span></span>
+                  <span className="whitespace-nowrap">Total Qty : <span className="font-mono font-black text-[18px] sm:text-[19px] whitespace-nowrap">{totalQty.toFixed(0)}</span></span>
+                  <span className="whitespace-nowrap">Item Total : <span className="font-mono font-black text-[17.5px] sm:text-[18.5px] whitespace-nowrap">₹{Number(bill.subtotal).toFixed(2)}</span></span>
                 </div>
                 {bill.discount > 0 && (
-                  <div className="flex justify-between items-center text-red-700 font-semibold text-[12.5px]">
+                  <div className="flex justify-between items-center text-red-700 font-semibold text-[14px]">
                     <span>Discount :</span>
                     <span className="font-mono font-bold">-₹{Number(bill.discount).toFixed(2)}</span>
                   </div>
@@ -511,11 +544,11 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
 
               {/* 5. Grand Total (BOLD & PROMINENT) and Footer Line */}
               <div className={`my-2 pt-2 border-t-2 border-black ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
-                <div className="font-black text-[21px] sm:text-[23px] text-black tracking-wide py-0.5">
+                <div className="font-black text-[25px] sm:text-[27px] text-black tracking-wide py-0.5">
                   GRAND TOTAL: ₹{Number(bill.grandTotal).toFixed(2)}
                   <span className="sr-only">₹{bill.grandTotal}</span>
                 </div>
-                <div className="text-[12px] sm:text-[12.5px] font-bold text-black mt-1 tracking-wider">
+                <div className="text-[13px] sm:text-[13.5px] font-bold text-black mt-1 tracking-wider">
                   {receiptFooter}
                   <span className="sr-only">Thank you</span>
                 </div>
@@ -579,7 +612,16 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               }`}
             >
               <Printer className="w-4 h-4" />
-              <span>{(isPrinting || isPrintingLocal) ? 'Printing...' : (printButtonText || (isReprint ? 'Confirm & Print Reprint' : 'Print Receipt (F10)'))}</span>
+              <span>
+                {isPrinting || isPrintingLocal
+                  ? 'Printing...'
+                  : printButtonText ||
+                    (isReprint
+                      ? 'Confirm & Print Reprint'
+                      : isSandboxed
+                      ? 'Print Receipt (New Window)'
+                      : 'Print Receipt (F10)')}
+              </span>
             </button>
           </div>
         </div>

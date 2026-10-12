@@ -592,10 +592,17 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
           setTimeout(() => setNotification(null), 3000);
         } else {
           const errMsg = printRes.error || 'Receipt could not be sent to the print system.';
+          // Automatically open thermal receipt modal so cashier has immediate on-screen access
+          setSavedBill(prepared.bill);
+          setSavedBillItems(prepared.items);
+          setIsReceiptModalOpen(true);
+
           setNotification({
-            type: 'error',
-            message: `Bill #${cleanBillNum} Saved - Printing Failed`
+            type: 'warning',
+            message: `Bill #${cleanBillNum} Saved - ${printRes.restrictedInIframe ? 'On-Screen Receipt Opened' : 'Printing Failed'}`
           });
+          setTimeout(() => setNotification(null), 4000);
+
           setPrintFailureModal({
             bill: prepared.bill,
             items: prepared.items,

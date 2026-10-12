@@ -19,7 +19,8 @@ import {
   Users,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { RestaurantSettings } from '../../types';
@@ -317,6 +318,20 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
+
+          {/* Standalone Tab Button (Unlocks Native Hardware / WebSerial / System Spooler when in iframe) */}
+          {typeof window !== 'undefined' && window.self !== window.top && (
+            <button
+              type="button"
+              onClick={() => window.open(window.location.href, '_blank', 'noopener,noreferrer')}
+              className="h-6 px-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs transition-colors"
+              title="Open in standalone browser window to unlock direct Web Serial / USB thermal printers and native print dialogs"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span className="hidden sm:inline">Open in Tab (Unlocks Printer)</span>
+              <span className="sm:hidden">New Tab</span>
+            </button>
+          )}
 
           {/* Auth Action */}
           <button

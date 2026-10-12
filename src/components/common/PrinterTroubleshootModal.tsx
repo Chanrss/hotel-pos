@@ -40,7 +40,17 @@ export const PrinterTroubleshootModal: React.FC<PrinterTroubleshootModalProps> =
   useEffect(() => {
     if (!isOpen) return;
     const unsubStatus = PrinterStatusService.subscribe((check) => {
-      setHealthCheck(check);
+      setHealthCheck((prev) => {
+        if (
+          prev.status === check.status &&
+          prev.isReady === check.isReady &&
+          prev.label === check.label &&
+          prev.connectedInfo?.connected === check.connectedInfo?.connected
+        ) {
+          return prev;
+        }
+        return check;
+      });
     });
     return () => {
       unsubStatus();
@@ -100,9 +110,23 @@ export const PrinterTroubleshootModal: React.FC<PrinterTroubleshootModalProps> =
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold leading-tight">Thermal Printer</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  READY
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 ${
+                  healthCheck.status === 'READY' || healthCheck.status === 'CONNECTED'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    : healthCheck.status === 'NOT_CONNECTED'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    : healthCheck.status === 'MOCK'
+                    ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                    : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    healthCheck.status === 'READY' || healthCheck.status === 'CONNECTED'
+                      ? 'bg-emerald-400'
+                      : healthCheck.status === 'NOT_CONNECTED'
+                      ? 'bg-amber-400'
+                      : 'bg-rose-400 animate-pulse'
+                  }`} />
+                  {healthCheck.label}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -131,6 +155,8 @@ export const PrinterTroubleshootModal: React.FC<PrinterTroubleshootModalProps> =
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
                 healthCheck.status === 'OFFLINE'
                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  : healthCheck.status === 'NOT_CONNECTED'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : healthCheck.status === 'MOCK'
                   ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                   : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'

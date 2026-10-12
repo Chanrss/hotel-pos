@@ -475,11 +475,13 @@ export const PrinterDiagnosticView: React.FC<PrinterDiagnosticViewProps> = ({
                   Printer Diagnostics &amp; POS Setup
                 </h2>
                 <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider font-mono border ${
-                  healthCheck.status === 'READY' 
+                  healthCheck.status === 'READY' || healthCheck.status === 'CONNECTED'
                     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                     : healthCheck.status === 'MOCK'
                     ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
-                    : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    : healthCheck.status === 'NOT_CONNECTED'
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                 }`}>
                   {healthCheck.label}
                 </span>

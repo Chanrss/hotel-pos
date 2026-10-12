@@ -42,6 +42,9 @@ export class PrinterStatusService {
     const lastJob = recentLogs.length > 0 ? recentLogs[0] : null;
     const hasSucceededBefore = recentLogs.some((l) => l.status === 'SUCCESS') || connectedInfo.testPrintVerified;
 
+    const isDirectHardware = PrinterConnectionService.isDirectHardwareReady();
+    const isExplicitlyConnected = Boolean(connectedInfo.connected && isDirectHardware);
+
     let status: PrinterStatusCode = 'READY';
     let warningMessage: string | null = null;
     let summary = 'Printer is ready for instant thermal receipts';
@@ -58,7 +61,7 @@ export class PrinterStatusService {
       dotColor = 'bg-red-600 animate-pulse';
       summary = 'Browser printing interface is unavailable on this device';
       warningMessage = 'Your browser environment does not support window.print(). Thermal printing cannot be triggered.';
-    } else if (lastJob && lastJob.status === 'FAILURE') {
+    } else if (lastJob && lastJob.status === 'FAILURE' && (Date.now() - (lastJob.createdAt || (lastJob.timestamp ? new Date(lastJob.timestamp).getTime() : 0)) < 300000)) {
       status = 'OFFLINE';
       label = 'PRINTER ERROR';
       badgeColor = 'bg-red-50 text-red-700 border-red-300';
@@ -72,24 +75,26 @@ export class PrinterStatusService {
       dotColor = 'bg-indigo-500';
       summary = 'Development simulation active - receipts are logged without physical paper feed';
       warningMessage = 'Hardware printer is bypassed. Go to Settings > Thermal Printer to enable real hardware printing.';
-    } else if (isSandboxed) {
-      status = 'READY';
-      label = 'PRINTER READY';
+    } else if (isDirectHardware) {
+      status = 'CONNECTED';
+      label = 'PRINTER CONNECTED';
       badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-300';
       dotColor = 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]';
-      summary = `Thermal printing ready (${activeModelName}). (Open in New Tab for physical USB spooler)`;
+      summary = `Direct hardware printer connected (${connectedInfo.deviceName || activeModelName})`;
       warningMessage = null;
     } else {
-      status = 'READY';
-      label = 'PRINTER READY';
-      badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-300';
-      dotColor = 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]';
-      summary = `Thermal printer active (${activeModelName})`;
+      // Physical printer is NOT connected to this device
+      status = 'NOT_CONNECTED';
+      label = 'PRINTER NOT CONNECTED';
+      badgeColor = 'bg-amber-50 text-amber-800 border-amber-300';
+      dotColor = 'bg-amber-500 animate-pulse';
+      summary = 'Thermal printer is not connected to device. Connect USB cable & power on.';
+      warningMessage = 'Thermal printer is not detected. Ensure USB cable is plugged in, printer power is turned ON, and paper roll is inserted.';
     }
 
     const result: PrinterHealthCheck = {
       status,
-      isReady: status === 'READY' || (status as any) === 'CONNECTED' || (status as any) === 'RESTRICTED' || status === 'MOCK',
+      isReady: status === 'CONNECTED' || status === 'MOCK',
       label,
       badgeColor,
       dotColor,

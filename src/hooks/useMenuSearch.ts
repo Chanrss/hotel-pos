@@ -33,19 +33,16 @@ export function useMenuSearch(
   const { debounceMs = 60, maxResults = 10 } = options;
 
   const [debouncedQuery, setDebouncedQuery] = useState(rawInput);
-  const [isDebouncing, setIsDebouncing] = useState(false);
+  const isDebouncing = rawInput !== debouncedQuery;
 
   // Debounce the raw input to prevent excessive computations while keeping typing snappy
   useEffect(() => {
     if (rawInput === debouncedQuery) {
-      setIsDebouncing(false);
       return;
     }
 
-    setIsDebouncing(true);
     const handler = setTimeout(() => {
       setDebouncedQuery(rawInput);
-      setIsDebouncing(false);
     }, debounceMs);
 
     return () => {

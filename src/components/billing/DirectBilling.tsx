@@ -26,7 +26,9 @@ import {
   Receipt,
   X,
   Cloud,
-  ChefHat
+  ChefHat,
+  FileText,
+  Usb
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CartItem, MenuItem, OrderType, PriceType, RestaurantSettings, Bill, BillItem, Kot, KotItem } from '../../types';
@@ -294,39 +296,46 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
     return uniqueItems.filter((m) => itemBelongsToCategory(m, selectedCategory, DEFAULT_CATEGORIES));
   }, [menuItems, selectedCategory]);
 
+  // Memoized search options to prevent recreated object references
+  const searchOptions = useMemo(() => ({ debounceMs: 30, maxResults: 8 }), []);
+  const modalSearchOptions = useMemo(() => ({ debounceMs: 30, maxResults: 100 }), []);
+
   // Memoized debounced local search hook
   const {
     matchingSuggestions,
     exactMatch,
     topMatch
-  } = useMenuSearch(menuItems, itemCodeInput, priceType, { debounceMs: 30, maxResults: 8 });
+  } = useMenuSearch(menuItems, itemCodeInput, priceType, searchOptions);
 
   // Memoized search hook for F4 modal search
-  const modalSearchResults = useMenuSearch(menuItems, searchQuery, priceType, { debounceMs: 30, maxResults: 100 });
+  const modalSearchResults = useMenuSearch(menuItems, searchQuery, priceType, modalSearchOptions);
 
   // Live exact or close item match update as user types
   useEffect(() => {
     const trimmed = itemCodeInput.trim().toUpperCase();
     if (!trimmed) {
-      setSelectedMenuItem(null);
-      setInputError(null);
-      setShowSuggestions(false);
+      setSelectedMenuItem((prev) => (prev !== null ? null : prev));
+      setInputError((prev) => (prev !== null ? null : prev));
+      setShowSuggestions((prev) => (prev !== false ? false : prev));
       return;
     }
 
-    if (exactMatch) {
-      setSelectedMenuItem(exactMatch);
-      setInputError(null);
-    } else if (
+    const target = exactMatch || (
       topMatch &&
       (topMatch.itemCode?.toUpperCase().startsWith(trimmed) ||
        topMatch.itemName?.toUpperCase().startsWith(trimmed))
-    ) {
-      setSelectedMenuItem(topMatch);
-      setInputError(null);
-    } else {
-      setSelectedMenuItem(null);
-    }
+        ? topMatch
+        : null
+    );
+
+    setSelectedMenuItem((prev) => {
+      if (!prev && !target) return prev;
+      if (prev && target && prev.id === target.id && (prev as any).applicablePrice === (target as any).applicablePrice) {
+        return prev;
+      }
+      return target;
+    });
+    setInputError((prev) => (prev !== null ? null : prev));
   }, [itemCodeInput, exactMatch, topMatch]);
 
   // Autofocus Price Type or Item Code on initial mount
@@ -873,12 +882,15 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
         });
         setTimeout(() => setNotification(null), 3500);
       } else {
-        setPrintFailureModal({
-          bill: updatedBill,
-          items: itemsToPrint,
-          error: res.error || 'Receipt could not be sent to the print system.',
-          jobId: res.jobId
+        setSavedBill(updatedBill);
+        setSavedBillItems(itemsToPrint);
+        setIsReceiptModalOpen(true);
+        setNotification({
+          type: 'warning',
+          message: `Reprint #${nextCount} Ready - ${res.restrictedInIframe ? 'On-Screen Receipt Opened' : 'Print Modal Opened'}`,
+          billNumber: updatedBill.billNumber
         });
+        setTimeout(() => setNotification(null), 4000);
       }
       focusItemCodeInput();
     });
@@ -1174,11 +1186,18 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
             setTimeout(() => setNotification(null), 3500);
           } else {
             const errMsg = printRes.error || 'Receipt could not be sent to the print system.';
+            // Automatically open receipt preview modal so the user immediately sees the thermal receipt
+            setSavedBill(prepared.bill);
+            setSavedBillItems(prepared.items);
+            setIsReceiptModalOpen(true);
+
             setNotification({
               type: 'warning',
-              message: `Bill ${cleanBillNum} Saved - Printing Failed`,
+              message: `Bill ${cleanBillNum} Saved - ${printRes.restrictedInIframe ? 'On-Screen Receipt Opened' : 'Printing Failed'}`,
               billNumber: cleanBillNum
             });
+            setTimeout(() => setNotification(null), 4500);
+
             setPrintFailureModal({
               bill: prepared.bill,
               items: prepared.items,
@@ -2040,8 +2059,42 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
 
             </div>
 
-            <div className="text-[10px] text-slate-500 font-medium text-center flex items-center justify-center gap-1.5 pt-0.5">
-              <span>⚡ Tap <strong className="text-slate-800 font-mono bg-slate-200 px-1 py-0.5 rounded text-[10px]">[Ctrl]</strong> key to print directly to thermal printer without Google preview</span>
+            <div className="text-[10px] text-slate-500 font-medium text-center flex items-center justify-center gap-1.5 pt-0.5 flex-wrap">
+              <span>⚡ Tap <strong className="text-slate-800 font-mono bg-slate-200 px-1 py-0.5 rounded text-[10px]">[Ctrl]</strong> key to print directly</span>
+              <span className="text-slate-300">•</span>
+              <button
+                type="button"
+                onClick={() => setIsHardwareModalOpen(true)}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors border ${
+                  PrinterConnectionService.isDirectHardwareReady()
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+                    ? 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100'
+                    : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                }`}
+                title={
+                  PrinterConnectionService.isDirectHardwareReady()
+                    ? 'Direct Hardware Printer Ready: 0-Click ESC/POS printing (Click for settings)'
+                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+                    ? 'System Spooler active (Click to pair Rugtek RP326 for 0-click print)'
+                    : 'No Hardware Printer Connected (Click to pair USB/Serial printer)'
+                }
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  PrinterConnectionService.isDirectHardwareReady()
+                    ? 'bg-emerald-500'
+                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+                    ? 'bg-sky-500'
+                    : 'bg-amber-500 animate-pulse'
+                }`} />
+                <span>
+                  {PrinterConnectionService.isDirectHardwareReady()
+                    ? 'Hardware Printer Ready'
+                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
+                    ? 'System Spooler (Pair Rugtek)'
+                    : 'Printer Not Connected'}
+                </span>
+              </button>
             </div>
 
           </div>
@@ -2217,7 +2270,29 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSavedBill(printFailureModal.bill);
+                setSavedBillItems(printFailureModal.items);
+                setIsReceiptModalOpen(true);
+              }}
+              className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>View Receipt</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsHardwareModalOpen(true)}
+              className="py-1.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Usb className="w-3.5 h-3.5" />
+              <span>Pair Hardware</span>
+            </button>
+
             <button
               type="button"
               onClick={async () => {
@@ -2258,7 +2333,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                 }
                 focusItemCodeInput();
               }}
-              className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Retry Print</span>
@@ -2270,9 +2345,9 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                 setPrintFailureModal(null);
                 focusItemCodeInput();
               }}
-              className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl cursor-pointer border border-slate-700"
+              className="py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl cursor-pointer border border-slate-700 flex items-center justify-center"
             >
-              Continue
+              Dismiss
             </button>
           </div>
         </div>

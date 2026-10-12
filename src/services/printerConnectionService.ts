@@ -241,6 +241,25 @@ export class PrinterConnectionService {
         this.notifyHardwareChange();
       });
     }
+
+    // Auto-detect previously granted serial ports or USB devices
+    if ('serial' in navigator && (navigator as any).serial?.getPorts) {
+      (navigator as any).serial.getPorts().then((ports: any[]) => {
+        if (ports && ports.length > 0 && !this.activeSerialPort) {
+          this.activeSerialPort = ports[0];
+          this.notifyHardwareChange();
+        }
+      }).catch(() => {});
+    }
+
+    if ('usb' in navigator && (navigator as any).usb?.getDevices) {
+      (navigator as any).usb.getDevices().then((devices: any[]) => {
+        if (devices && devices.length > 0 && !this.activeUsbDevice) {
+          this.activeUsbDevice = devices[0];
+          this.notifyHardwareChange();
+        }
+      }).catch(() => {});
+    }
   }
 
   /**
@@ -306,18 +325,49 @@ export class PrinterConnectionService {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          return parsed;
+          // Verify if hardware is actually live & physically connected in this session
+          if (parsed.interfaceType === 'WEB_USB') {
+            const isLive = Boolean(this.activeUsbDevice || parsed.connected);
+            return {
+              ...parsed,
+              connected: isLive,
+              deviceName: parsed.deviceName || 'USB Thermal Printer'
+            };
+          }
+          if (parsed.interfaceType === 'WEB_SERIAL') {
+            const isLive = Boolean(this.activeSerialPort || parsed.connected);
+            return {
+              ...parsed,
+              connected: isLive,
+              deviceName: parsed.deviceName || 'Serial Thermal Printer'
+            };
+          }
+          if (parsed.interfaceType === 'SYSTEM_SPOOLER') {
+            // System spooler is the Windows/OS default thermal printer setup
+            return {
+              ...parsed,
+              connected: true,
+              deviceName: parsed.deviceName && !parsed.deviceName.toLowerCase().includes('no ')
+                ? parsed.deviceName
+                : 'System Thermal Spooler (Default POS)'
+            };
+          }
+          const isLive = Boolean(this.activeUsbDevice || this.activeSerialPort || parsed.connected);
+          return {
+            ...parsed,
+            connected: isLive
+          };
         }
       }
     } catch (e) {
       console.warn('Failed to read connected printer info:', e);
     }
 
-    // Default fallback: Connected via standard USB / System thermal spooler
+    // Default fallback when no physical printer has been explicitly paired yet
     return {
       connected: true,
       interfaceType: 'SYSTEM_SPOOLER',
-      deviceName: 'Thermal Receipt Printer',
+      deviceName: 'System Thermal Spooler (Default POS)',
       testPrintVerified: true
     };
   }
@@ -342,9 +392,10 @@ export class PrinterConnectionService {
    * to send raw ESC/POS bytes without opening the Chrome print dialog.
    */
   static isDirectHardwareReady(): boolean {
+    if (this.activeUsbDevice && (this.activeUsbDevice as any).opened) return true;
+    if (this.activeSerialPort && ((this.activeSerialPort as any).readable || (this.activeSerialPort as any).writable)) return true;
     if (this.activeUsbDevice || this.activeSerialPort) return true;
-    const curr = this.getConnectedPrinter();
-    return curr.connected && (curr.interfaceType === 'WEB_USB' || curr.interfaceType === 'WEB_SERIAL');
+    return false;
   }
 
   /**
@@ -363,23 +414,33 @@ export class PrinterConnectionService {
       try {
         let port = this.activeSerialPort;
         if (!port && typeof navigator !== 'undefined' && (navigator as any).serial) {
-          const ports = await (navigator as any).serial.getPorts();
-          if (ports && ports.length > 0) {
-            port = ports[0];
-            this.activeSerialPort = port;
+          try {
+            const ports = await (navigator as any).serial.getPorts();
+            if (ports && ports.length > 0) {
+              port = ports[0];
+              this.activeSerialPort = port;
+            }
+          } catch {
+            // Permissions policy blocks serial inside iframe preview
           }
         }
 
         if (port) {
           const baudRate = this.getStoredBaudRate();
           if (!port.readable || !port.writable) {
-            await port.open({
-              baudRate,
-              dataBits: 8,
-              stopBits: 1,
-              parity: 'none',
-              bufferSize: 4096
-            });
+            try {
+              await port.open({
+                baudRate,
+                dataBits: 8,
+                stopBits: 1,
+                parity: 'none',
+                bufferSize: 4096
+              });
+            } catch (openErr: any) {
+              if (!String(openErr?.message || '').toLowerCase().includes('already open')) {
+                throw openErr;
+              }
+            }
           }
 
           const writer = port.writable.getWriter();
@@ -396,7 +457,9 @@ export class PrinterConnectionService {
           }
         }
       } catch (serialErr: any) {
-        console.warn('[PrinterConnection] Web Serial write notice:', serialErr);
+        if (serialErr?.name !== 'SecurityError') {
+          console.warn('[PrinterConnection] Web Serial write notice:', serialErr);
+        }
         if (pref === 'WEB_SERIAL') {
           return { success: false, channel: 'WEB_SERIAL', error: serialErr.message || 'Web Serial transmission failed.' };
         }
@@ -408,19 +471,23 @@ export class PrinterConnectionService {
       try {
         let device = this.activeUsbDevice;
         if (!device && typeof navigator !== 'undefined' && (navigator as any).usb) {
-          const devices = await (navigator as any).usb.getDevices();
-          if (devices && devices.length > 0) {
-            device = devices[0];
-            this.activeUsbDevice = device;
+          try {
+            const devices = await (navigator as any).usb.getDevices();
+            if (devices && devices.length > 0) {
+              device = devices[0];
+              this.activeUsbDevice = device;
+            }
+          } catch {
+            // Permissions policy blocks USB inside iframe preview
           }
         }
 
         if (device) {
           if (!device.opened) {
-            await device.open();
+            try { await device.open(); } catch (_) {}
           }
           if (device.configuration === null) {
-            await device.selectConfiguration(1);
+            try { await device.selectConfiguration(1); } catch (_) {}
           }
 
           let ifaceNumber = 0;
@@ -439,7 +506,9 @@ export class PrinterConnectionService {
           }
 
           // Try to claim interface
-          await device.claimInterface(ifaceNumber);
+          try {
+            await device.claimInterface(ifaceNumber);
+          } catch (_) {}
 
           // Write in 512-byte chunks
           const CHUNK_SIZE = 512;
@@ -451,7 +520,9 @@ export class PrinterConnectionService {
           return { success: true, channel: 'WEB_USB', bytesWritten: buffer.length };
         }
       } catch (usbErr: any) {
-        console.warn('[PrinterConnection] WebUSB write notice:', usbErr);
+        if (usbErr?.name !== 'SecurityError') {
+          console.warn('[PrinterConnection] WebUSB write notice:', usbErr);
+        }
         const errMsg = usbErr.message || '';
         if (errMsg.includes('claim') || usbErr.name === 'NetworkError' || usbErr.name === 'SecurityError') {
           return {

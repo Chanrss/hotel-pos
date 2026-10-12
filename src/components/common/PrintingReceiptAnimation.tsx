@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Printer, CheckCircle2, Scissors, Zap, X } from 'lucide-react';
 import { Bill, BillItem, RestaurantSettings } from '../../types';
@@ -38,22 +38,40 @@ export const PrintingReceiptAnimation: React.FC<PrintingReceiptAnimationProps> =
   const [printStage, setPrintStage] = useState<'feeding' | 'cutting' | 'completed'>('feeding');
   const [progress, setProgress] = useState(0);
 
+  const completedJobRef = useRef<string | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   // Sync with external isActive if provided
   useEffect(() => {
     if (externalIsActive !== undefined) {
+      const billKey = initialBill?.id || initialBill?.billNumber;
       if (externalIsActive && initialBill) {
-        setActiveJob({
-          bill: initialBill,
-          items: initialItems || [],
-          settings: initialSettings
+        if (completedJobRef.current && completedJobRef.current === billKey) {
+          return;
+        }
+        setActiveJob((prev) => {
+          if (
+            prev?.bill?.id === initialBill.id &&
+            prev?.bill?.billNumber === initialBill.billNumber &&
+            prev?.items?.length === (initialItems?.length || 0)
+          ) {
+            return prev;
+          }
+          return {
+            bill: initialBill,
+            items: initialItems || [],
+            settings: initialSettings
+          };
         });
         setPrintStage('feeding');
         setProgress(0);
       } else if (!externalIsActive) {
+        completedJobRef.current = null;
         setActiveJob(null);
       }
     }
-  }, [externalIsActive, initialBill, initialItems, initialSettings]);
+  }, [externalIsActive, initialBill?.id, initialBill?.billNumber]);
 
   // Global print event listener (only when mode is toast-widget)
   useEffect(() => {
@@ -101,8 +119,10 @@ export const PrintingReceiptAnimation: React.FC<PrintingReceiptAnimationProps> =
 
     // Auto dismiss
     const dismissTimer = setTimeout(() => {
+      const currentJobKey = activeJob?.bill?.id || activeJob?.bill?.billNumber || 'job';
+      completedJobRef.current = currentJobKey;
       setActiveJob(null);
-      if (onComplete) onComplete();
+      if (onCompleteRef.current) onCompleteRef.current();
     }, autoDismissMs);
 
     return () => {
@@ -113,7 +133,7 @@ export const PrintingReceiptAnimation: React.FC<PrintingReceiptAnimationProps> =
       clearTimeout(completeTimer);
       clearTimeout(dismissTimer);
     };
-  }, [activeJob?.bill?.id, activeJob?.bill?.billNumber, autoDismissMs, onComplete]);
+  }, [activeJob?.bill?.id, activeJob?.bill?.billNumber, autoDismissMs]);
 
   if (!activeJob || !activeJob.bill) return null;
 

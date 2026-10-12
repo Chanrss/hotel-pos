@@ -424,20 +424,20 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
                 {PREVIEW_ITEMS.map((item, idx) => (
                   <tr key={item.id} className="align-top">
                     {showItemSl && (
-                      <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left font-mono`}>
+                      <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left font-mono text-black font-semibold text-[13px]`}>
                         {idx + 1}
                       </td>
                     )}
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left pr-1 break-words font-semibold font-sans`}>
-                      {item.name}
+                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left pr-1 break-words`}>
+                      <div className="font-black font-sans text-black text-[16px] sm:text-[17px] leading-tight">{item.name}</div>
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono`}>
-                      {item.qty}
+                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-black text-black text-[16px] sm:text-[17px]`}>
+                      <b>{item.qty}</b>
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono`}>
+                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-bold text-black text-[15px] sm:text-[16px]`}>
                       {item.price}
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-semibold`}>
+                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-black text-black text-[16px] sm:text-[17px]`}>
                       {item.total}
                     </td>
                   </tr>

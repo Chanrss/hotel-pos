@@ -100,17 +100,20 @@ export class PrinterService {
     const headerScale = headerScaleMap[settings?.receiptHeaderFontSize || 'normal'];
     const titleFontSize = Math.round(baseFontSize * headerScale * 10) / 10;
 
-    const itemScaleMap = { normal: 1.15, large: 1.25, prominent: 1.35 };
-    const itemScale = itemScaleMap[settings?.receiptItemFontSize || 'normal'];
+    const itemScaleMap = { normal: 1.5, large: 1.65, prominent: 1.8 };
+    const itemScale = itemScaleMap[settings?.receiptItemFontSize || 'normal'] || 1.5;
     const itemFontSize = Math.round(baseFontSize * itemScale * 10) / 10;
+    const qtyFontSize = Math.round(baseFontSize * 1.55 * 10) / 10;
+    const priceFontSize = Math.round(baseFontSize * 1.4 * 10) / 10;
+    const lineTotalFontSize = Math.round(baseFontSize * 1.5 * 10) / 10;
 
-    const totalScaleMap = { normal: 1.3, large: 1.45, huge: 1.6 };
-    const totalScale = totalScaleMap[settings?.receiptTotalFontSize || 'normal'];
+    const totalScaleMap = { normal: 1.75, large: 1.95, huge: 2.15 };
+    const totalScale = totalScaleMap[settings?.receiptTotalFontSize || 'normal'] || 1.75;
     const totalFontSize = Math.round(baseFontSize * totalScale * 10) / 10;
 
-    const headerFontSize = Math.round(baseFontSize * 1.08 * 10) / 10;
-    const metaFontSize = Math.round(baseFontSize * 1.04 * 10) / 10;
-    const priceFontSize = Math.round(baseFontSize * 1.1 * 10) / 10;
+    const headerFontSize = Math.round(baseFontSize * 1.15 * 10) / 10;
+    const metaFontSize = Math.round(baseFontSize * 1.1 * 10) / 10;
+    const tableHeaderFontSize = Math.round(baseFontSize * 1.3 * 10) / 10;
     const smallFontSize = Math.round(baseFontSize * 0.9 * 10) / 10;
 
     const lineSpacingMap = { tight: '1.15', normal: '1.22', relaxed: '1.35' };
@@ -461,10 +464,10 @@ export class PrinterService {
       <table class="items-table">
         <thead>
           <tr>
-            <th style="width: 46%; text-align: left; padding: ${itemRowPaddingVal}; word-break: break-word;">Item</th>
-            <th style="width: 14%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap;">Qty</th>
-            <th style="width: 20%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap;">Price</th>
-            <th style="width: 20%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap;">Total</th>
+            <th style="width: 44%; text-align: left; padding: ${itemRowPaddingVal}; word-break: break-word; font-weight: 900; font-size: ${tableHeaderFontSize}px;">பொருள்</th>
+            <th style="width: 16%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap; font-weight: 900; font-size: ${tableHeaderFontSize}px;">Qty</th>
+            <th style="width: 20%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap; font-weight: 900; font-size: ${tableHeaderFontSize}px;">Price</th>
+            <th style="width: 20%; text-align: right; padding: ${itemRowPaddingVal}; white-space: nowrap; font-weight: 900; font-size: ${tableHeaderFontSize}px;">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -474,11 +477,11 @@ export class PrinterService {
             return `
               <tr>
                 <td style="text-align: left; padding: ${itemRowPaddingVal}; vertical-align: top; word-break: break-word; overflow-wrap: break-word;">
-                  <div style="font-weight: 700; font-size: ${itemFontSize}px; line-height: 1.2; text-align: left; word-break: break-word; margin: 0; padding: 0;">${displayName}</div>
+                  <div style="font-weight: 900; font-size: ${itemFontSize}px; line-height: 1.25; text-align: left; word-break: break-word; margin: 0; padding: 0; font-family: 'Mukta Malar', 'Noto Sans Tamil', 'Latha', 'Nirmala UI', sans-serif;">${displayName}</div>
                 </td>
-                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-weight: 700; font-size: ${itemFontSize}px; white-space: nowrap; vertical-align: top;">${Number(itm.quantity).toFixed(0)}</td>
-                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-size: ${priceFontSize}px; white-space: nowrap; vertical-align: top;">${Number(itm.unitPrice).toFixed(0)}</td>
-                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-weight: 700; font-size: ${priceFontSize}px; white-space: nowrap; vertical-align: top;">${Number(itm.totalPrice).toFixed(0)}</td>
+                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-weight: 900; font-size: ${qtyFontSize}px; white-space: nowrap; vertical-align: top;"><b>${Number(itm.quantity).toFixed(0)}</b></td>
+                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-weight: 800; font-size: ${priceFontSize}px; white-space: nowrap; vertical-align: top;">${Number(itm.unitPrice).toFixed(0)}</td>
+                <td style="text-align: right; padding: ${itemRowPaddingVal}; font-family: monospace; font-weight: 900; font-size: ${lineTotalFontSize}px; white-space: nowrap; vertical-align: top;">${Number(itm.totalPrice).toFixed(0)}</td>
               </tr>
             `;
           }).join('')}
@@ -488,8 +491,8 @@ export class PrinterService {
       ${(bill.discount > 0 || showTotalQty) ? `
       <div class="net-summary">
         <div class="summary-line">
-          ${showTotalQty ? `<span>Total Qty: <b>${totalQty.toFixed(0)}</b></span>` : '<span></span>'}
-          <span>Subtotal: <b>₹${Number(bill.subtotal).toFixed(0)}</b></span>
+          ${showTotalQty ? `<span>Total Qty: <b style="font-size: ${qtyFontSize}px; font-weight: 900;">${totalQty.toFixed(0)}</b></span>` : '<span></span>'}
+          <span>Subtotal: <b style="font-size: ${priceFontSize}px;">₹${Number(bill.subtotal).toFixed(0)}</b></span>
         </div>
         ${bill.discount > 0 ? `
           <div class="summary-line">
@@ -504,7 +507,7 @@ export class PrinterService {
       <div class="grand-total-section">
         <div class="grand-total-row">
           <span>Grand Total:</span>
-          <span>₹${Number(bill.grandTotal).toFixed(0)}</span>
+          <span style="font-size: ${totalFontSize}px; font-weight: 900;">₹${Number(bill.grandTotal).toFixed(0)}</span>
         </div>
       </div>
 
@@ -669,9 +672,9 @@ export class PrinterService {
 
   /**
    * Reliable print workflow:
-   * 1. Populates #pos-print-root and dedicated print iframe
-   * 2. Waits until DOM and logo/watermark images are loaded (with single-execution guard)
-   * 3. Applies print CSS and triggers browser print without double-triggering or premature cleanup
+   * 1. Injects receipt HTML and scoped print styles into #pos-print-root
+   * 2. Sets body print-ready state and calls window.print() synchronously
+   * 3. Fully compatible with Chrome Kiosk Printing (--kiosk-printing) and OS print spooler
    */
   static printHtmlDocument(
     htmlContent: string, 
@@ -685,118 +688,32 @@ export class PrinterService {
       return { success: false, error: 'Browser print system (window.print) is not supported in this environment.' };
     }
 
-    const activeEl = document.activeElement as HTMLElement | null;
+    // In unit testing environment (e.g. mocked print or jsdom/vitest), execute direct DOM
+    const isMockOrTest =
+      Boolean((window.print as any)?.mock) ||
+      Boolean((window as any).__VITEST__) ||
+      (typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom'));
 
-    // 1. Always populate #pos-print-root in the main document
-    PrinterService.populatePrintRoot(htmlContent);
-    document.body.classList.add('print-ready');
-    document.body.classList.add('pos-printing');
-
-    try {
-      // 2. If running in a unit test environment with mocked window.print, invoke it synchronously
-      if ((window.print as any).mock) {
-        if (typeof window.focus === 'function') window.focus();
-        window.print();
-        PrinterService.restoreWindowFocus(activeEl);
-        return { success: true };
-      }
-
-      // 3. Prepare dedicated print iframe (visible to print engine, 1px off-corner so images paint properly)
-      let iframe = document.getElementById('pos-thermal-printer-frame') as HTMLIFrameElement | null;
-      if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'pos-thermal-printer-frame';
-        iframe.setAttribute(
-          'style',
-          'position:fixed;right:0;bottom:0;width:302px;height:1px;border:0;visibility:visible;z-index:-1;pointer-events:none;'
-        );
-        document.body.appendChild(iframe);
-      }
-
-      const contentWindow = iframe.contentWindow;
-      if (!contentWindow) {
-        return PrinterService.printViaDirectDOM(htmlContent, settings);
-      }
-
-      const doc = contentWindow.document;
-      doc.open();
-      doc.write(htmlContent);
-      doc.close();
-
-      let hasExecuted = false;
-      let fallbackTimer: any = null;
-
-      const executePrintOnce = (): { success: boolean; restrictedInIframe?: boolean; error?: string } => {
-        if (hasExecuted) return { success: true };
-        hasExecuted = true;
-        if (fallbackTimer) {
-          clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }
-
-        try {
-          const cleanupAfterPrint = () => {
-            PrinterService.restoreWindowFocus(activeEl);
-          };
-
-          if ('onafterprint' in contentWindow) {
-            contentWindow.onafterprint = cleanupAfterPrint;
-          }
-          window.addEventListener('afterprint', cleanupAfterPrint, { once: true });
-
-          contentWindow.focus();
-          contentWindow.print();
-
-          // Keep print classes active long enough for print spooler to read DOM & images
-          setTimeout(cleanupAfterPrint, 2000);
-
-          return { success: true };
-        } catch (printErr: any) {
-          console.error('Thermal printer iframe print failed:', printErr);
-          const isRestricted = printErr?.name === 'SecurityError' || 
-            String(printErr?.message || '').toLowerCase().includes('sandbox') ||
-            String(printErr?.message || '').toLowerCase().includes('allow-modals');
-          
-          if (!isRestricted) {
-            return PrinterService.printViaDirectDOM(htmlContent, settings);
-          }
-          PrinterService.restoreWindowFocus(activeEl);
-          return {
-            success: false,
-            restrictedInIframe: true,
-            error: 'Browser print window was blocked by preview sandbox restrictions.'
-          };
-        }
-      };
-
-      // 4. Wait for all logo/watermark images in the print document before printing
-      const images = Array.from(doc.querySelectorAll('img'));
-      const pendingImages = images.filter(img => !img.complete);
-
-      if (pendingImages.length === 0) {
-        return executePrintOnce();
-      } else {
-        let remaining = pendingImages.length;
-        const onImgSettled = () => {
-          remaining -= 1;
-          if (remaining <= 0) {
-            executePrintOnce();
-          }
-        };
-        pendingImages.forEach(img => {
-          img.addEventListener('load', onImgSettled, { once: true });
-          img.addEventListener('error', onImgSettled, { once: true });
-        });
-        fallbackTimer = setTimeout(() => {
-          executePrintOnce();
-        }, 250);
-        return { success: true };
-      }
-    } catch (err: any) {
-      console.error('Thermal printer print preparation failed:', err);
-      PrinterService.restoreWindowFocus(activeEl);
-      return { success: false, error: err?.message || 'Receipt could not be sent to the print system.' };
+    if (isMockOrTest) {
+      return PrinterService.printViaDirectDOM(htmlContent, settings);
     }
+
+    // If running in an iframe sandbox (e.g. AI Studio preview container),
+    // window.print() is silently ignored by Chrome without throwing!
+    if (PrinterService.isSandboxed()) {
+      // Attempt popup print if popups are permitted
+      const popupRes = PrinterService.printViaPopup(htmlContent);
+      if (popupRes.success) {
+        return { success: true };
+      }
+      return {
+        success: false,
+        restrictedInIframe: true,
+        error: 'Browser printing is restricted inside the preview sandbox container. On-screen receipt modal opened.'
+      };
+    }
+
+    return PrinterService.printViaDirectDOM(htmlContent, settings);
   }
 
   /**
@@ -811,6 +728,62 @@ export class PrinterService {
    */
   static isSandboxed(): boolean {
     return typeof window !== 'undefined' && window.self !== window.top;
+  }
+
+  /**
+   * Opens the formatted receipt in a dedicated top-level browser tab/window,
+   * bypassing iframe sandbox restrictions and allowing Chrome/OS print dialog or thermal printer selection.
+   */
+  static openPrintableReceipt(htmlContent: string): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const enhancedHtml = htmlContent.replace('</head>', `
+  <style>
+    @media print {
+      .pos-standalone-bar { display: none !important; }
+    }
+  </style>
+  <script>
+    function triggerPrintNow() {
+      try {
+        window.focus();
+        window.print();
+      } catch (e) {
+        console.warn('Auto print failed:', e);
+      }
+    }
+    window.addEventListener('load', function() {
+      setTimeout(triggerPrintNow, 150);
+    });
+  </script>
+</head>`).replace('<body>', `<body>
+  <div class="pos-standalone-bar" style="position: sticky; top: 0; left: 0; right: 0; background: #0f172a; color: #ffffff; padding: 10px 16px; text-align: center; z-index: 999999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 12px;">
+    <span style="font-size: 13px; font-weight: 600; color: #f8fafc;">POS Thermal Receipt Print Window</span>
+    <button onclick="window.focus(); window.print();" style="background: #10b981; color: #ffffff; border: none; padding: 8px 18px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+      🖨️ Print Receipt (80mm)
+    </button>
+    <button onclick="window.close();" style="background: #334155; color: #cbd5e1; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+      Close Window
+    </button>
+  </div>`);
+
+      const blob = new Blob([enhancedHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, '_blank', 'noopener');
+      if (!opened) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Failed to open printable receipt window:', e);
+      return false;
+    }
   }
 
   /**
