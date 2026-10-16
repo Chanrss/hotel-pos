@@ -353,6 +353,9 @@ export interface RestaurantSettings {
   lastDailyBackupDate?: string;
   lastDailyBackupTimestamp?: number;
   lastDailyBackupStatus?: 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  enableRemotePrintQueue?: boolean; // Enable Firestore-based print queue for waiter devices
+  isPrimaryPrintServer?: boolean; // Set this terminal as the primary print server
+  remotePrintSoundNotification?: boolean; // Audio alert on incoming remote print jobs
   updatedAt?: number;
 }
 
@@ -472,6 +475,11 @@ export interface DailyBackupRecord {
   totalDocuments: number;
   fileSizeBytes?: number;
   checksum?: string;
+  exportFormat?: 'JSON' | 'XLSX' | 'PDF' | 'Export Excel' | string;
+  action?: 'Export Excel' | string;
+  exportType?: string;
+  description?: string;
+  createdAt?: number;
   errorMessage?: string;
 }
 
@@ -577,5 +585,34 @@ export interface UserActivityLog {
   timestamp: number;
   createdAt: string;
 }
+
+export type RemotePrintJobType = 'KOT' | 'BILL' | 'REPRINT' | 'TEST';
+export type RemotePrintJobStatus = 'PENDING' | 'PRINTING' | 'COMPLETED' | 'FAILED';
+
+export interface RemotePrintJob {
+  id: string;
+  jobType: RemotePrintJobType;
+  status: RemotePrintJobStatus;
+  sourceDeviceId: string;
+  sourceDeviceName?: string;
+  sourceUserName?: string;
+  tableNumber?: string;
+  referenceNumber: string; // e.g. "KOT-05" or "BN-102"
+  createdAt: number;
+  updatedAt: number;
+  executedAt?: number;
+  executedByDeviceId?: string;
+  errorMessage?: string;
+  kotData?: {
+    kot: Kot;
+    items: KotItem[];
+  };
+  billData?: {
+    bill: Bill;
+    items?: BillItem[];
+  };
+  htmlSnapshot?: string;
+}
+
 
 

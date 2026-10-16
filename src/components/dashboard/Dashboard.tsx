@@ -398,6 +398,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigate }) =>
         billItems={todayBillItems}
         canViewRevenue={canViewRevenue}
         onNavigate={onNavigate}
+        settings={settings}
       />
 
       {/* Dynamic Role-Gated High-Level Summary Cards */}

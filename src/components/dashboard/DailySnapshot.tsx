@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   IndianRupee, 
   Receipt, 
@@ -11,11 +11,19 @@ import {
   Lock,
   ArrowUpRight,
   Award,
-  Download
+  Download,
+  FileSpreadsheet,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  X
 } from 'lucide-react';
-import { Bill, BillItem } from '../../types';
+import { Bill, BillItem, RestaurantSettings } from '../../types';
 import { getLocalBillItems, getLocalItemsMap } from '../../services/localBillStore';
 import { downloadCoreBillingBackup } from '../../services/backupService';
+import { downloadDailyBillingExcel } from '../../services/excelBackupService';
+import { DailyPrintSummaryModal } from './DailyPrintSummaryModal';
 import { NavTab } from '../common/Sidebar';
 
 export interface TopSellingItemData {
@@ -33,6 +41,7 @@ export interface DailySnapshotProps {
   billItems?: BillItem[];
   canViewRevenue?: boolean;
   onNavigate?: (tab: NavTab) => void;
+  settings?: RestaurantSettings;
 }
 
 export const DailySnapshot: React.FC<DailySnapshotProps> = ({
@@ -40,8 +49,74 @@ export const DailySnapshot: React.FC<DailySnapshotProps> = ({
   bills,
   billItems,
   canViewRevenue = true,
-  onNavigate
+  onNavigate,
+  settings
 }) => {
+  const [isExportingJson, setIsExportingJson] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [feedbackToast, setFeedbackToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Auto-dismiss feedback toast after 7 seconds
+  useEffect(() => {
+    if (!feedbackToast) return;
+    const timer = setTimeout(() => {
+      setFeedbackToast(null);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [feedbackToast]);
+
+  const handleDownloadJson = async () => {
+    try {
+      setIsExportingJson(true);
+      const res = await downloadCoreBillingBackup(settings, businessDate);
+      if (res && res.success) {
+        const sizeStr = res.record?.fileSizeBytes ? ` (${Math.round(res.record.fileSizeBytes / 1024 * 10) / 10} KB)` : '';
+        setFeedbackToast({
+          type: 'success',
+          message: `JSON backup downloaded successfully: ${res.filename}${sizeStr}`
+        });
+      } else {
+        setFeedbackToast({
+          type: 'error',
+          message: res?.error || 'Failed to download JSON backup. Please try again.'
+        });
+      }
+    } catch (err: any) {
+      setFeedbackToast({
+        type: 'error',
+        message: err?.message || 'Error downloading JSON backup.'
+      });
+    } finally {
+      setIsExportingJson(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExportingExcel(true);
+      const res = await downloadDailyBillingExcel(settings, businessDate);
+      if (res && res.success) {
+        const sizeStr = res.fileSizeBytes ? ` (${Math.round(res.fileSizeBytes / 1024 * 10) / 10} KB)` : '';
+        setFeedbackToast({
+          type: 'success',
+          message: `Excel report downloaded: ${res.filename}${sizeStr}`
+        });
+      } else {
+        setFeedbackToast({
+          type: 'error',
+          message: res?.error || 'Failed to export Excel report. Please try again.'
+        });
+      }
+    } catch (err: any) {
+      setFeedbackToast({
+        type: 'error',
+        message: err?.message || 'Error generating Excel report.'
+      });
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
   // 1. Filter completed bills for the current business date
   const completedBills = useMemo(() => {
     return bills.filter(
@@ -179,25 +254,61 @@ export const DailySnapshot: React.FC<DailySnapshotProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 1. Download JSON Backup Button (Preserved ID & Functionality) */}
           <button
             type="button"
-            onClick={async () => {
-              await downloadCoreBillingBackup(undefined, businessDate);
-            }}
+            disabled={isExportingJson || isExportingExcel}
+            onClick={handleDownloadJson}
             id="snapshot-download-backup-btn"
-            className="text-xs text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-lg px-2.5 py-1 font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-            title="Download core billing JSON archive for today's business date"
+            className="text-xs text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-lg px-2.5 py-1.5 font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Download core billing JSON archive for disaster recovery & technical backup (Archive JSON)"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Archive JSON</span>
+            {isExportingJson ? (
+              <Loader2 className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+            )}
+            <span className="hidden sm:inline">Download JSON Backup</span>
+            <span className="sm:hidden">Archive JSON</span>
+          </button>
+
+          {/* 2. Export Excel Report Button */}
+          <button
+            type="button"
+            disabled={isExportingJson || isExportingExcel}
+            onClick={handleExportExcel}
+            id="snapshot-export-excel-btn"
+            className="text-xs text-teal-800 hover:text-teal-900 bg-teal-50 hover:bg-teal-100/80 border border-teal-200/80 rounded-lg px-2.5 py-1.5 font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Export multi-worksheet formatted Excel spreadsheet (.xlsx) for this business day"
+          >
+            {isExportingExcel ? (
+              <Loader2 className="w-3.5 h-3.5 text-teal-700 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-3.5 h-3.5 text-teal-700" />
+            )}
+            <span className="hidden sm:inline">Export Excel Report</span>
+            <span className="sm:hidden">Export Excel</span>
+          </button>
+
+          {/* 3. Export PDF Report Button (Printable Summary) */}
+          <button
+            type="button"
+            onClick={() => setIsPdfModalOpen(true)}
+            id="snapshot-export-pdf-btn"
+            className="text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 rounded-lg px-2.5 py-1.5 font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+            title="Open printable summary for saving as PDF or printing"
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="hidden md:inline">Export PDF Report</span>
+            <span className="md:hidden">Export PDF</span>
           </button>
 
           {onNavigate && (
             <button
               type="button"
               onClick={() => onNavigate('reports')}
-              className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-xs text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1 cursor-pointer transition-colors ml-1"
             >
               <span>Detailed Reports</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -205,6 +316,35 @@ export const DailySnapshot: React.FC<DailySnapshotProps> = ({
           )}
         </div>
       </div>
+
+      {/* Export Status / Feedback Toast Notification */}
+      {feedbackToast && (
+        <div 
+          className={`px-3.5 py-2.5 rounded-xl text-xs font-medium flex items-center justify-between gap-3 border transition-all animate-in fade-in slide-in-from-top-1 ${
+            feedbackToast.type === 'success'
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : 'bg-rose-50 text-rose-900 border-rose-200'
+          }`}
+          role="status"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {feedbackToast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span className="font-semibold truncate">{feedbackToast.message}</span>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setFeedbackToast(null)}
+            className="p-1 hover:bg-black/5 rounded-md text-slate-500 hover:text-slate-800 cursor-pointer shrink-0"
+            title="Dismiss notice"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 3 Main Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
@@ -366,6 +506,16 @@ export const DailySnapshot: React.FC<DailySnapshotProps> = ({
         </div>
 
       </div>
+
+      {/* Printable Daily Summary Modal */}
+      <DailyPrintSummaryModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        businessDate={businessDate}
+        bills={bills}
+        billItems={billItems}
+        settings={settings}
+      />
     </section>
   );
 };

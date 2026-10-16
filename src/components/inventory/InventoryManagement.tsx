@@ -36,9 +36,11 @@ import {
   SlidersHorizontal,
   Check,
   FileSpreadsheet,
-  Upload
+  Upload,
+  BarChart3
 } from 'lucide-react';
 import { BulkUpdateModal, BulkItemRow } from './BulkUpdateModal';
+import { StockThresholdBarChart } from './StockThresholdBarChart';
 import { useAuth } from '../../context/AuthContext';
 import { 
   InventoryItem, 
@@ -117,6 +119,7 @@ export const InventoryManagement: React.FC = () => {
   const [itemsFilterStatus, setItemsFilterStatus] = useState<'ALL' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'SELECTED'>('ALL');
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [bulkModalTab, setBulkModalTab] = useState<'PRICE' | 'STOCK' | 'MATRIX' | 'TEMPLATE'>('PRICE');
+  const [showStockChart, setShowStockChart] = useState<boolean>(true);
 
   // Modals
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
@@ -909,6 +912,20 @@ export const InventoryManagement: React.FC = () => {
           >
             <Plus className="w-4 h-4 text-amber-400" />
             <span>Add Countable Item</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowStockChart((v) => !v)}
+            className={`px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-colors cursor-pointer ${
+              showStockChart
+                ? 'bg-amber-500/15 text-amber-900 border-amber-300 font-black shadow-2xs'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Toggle Stock Level vs Minimum Threshold Bar Chart"
+          >
+            <BarChart3 className="w-4 h-4 text-amber-600" />
+            <span>{showStockChart ? 'Hide Stock Chart' : 'Stock Chart'}</span>
           </button>
 
           <button

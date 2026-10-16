@@ -8,6 +8,7 @@ import { KotManagement } from './components/kot/KotManagement';
 import { AuthModal } from './components/auth/AuthModal';
 import { PrintingReceiptAnimation } from './components/common/PrintingReceiptAnimation';
 import { DailyBackupNotificationToast } from './components/common/DailyBackupNotificationToast';
+import { RemotePrintQueueToast } from './components/common/RemotePrintQueueToast';
 import { DailyLowStockAlertModal, useDailyLowStockAlert } from './components/inventory/DailyLowStockAlertModal';
 import { useAutomatedDailyBackup } from './hooks/useAutomatedDailyBackup';
 import { RestaurantSettings } from './types';
@@ -287,6 +288,12 @@ const AppContent: React.FC = () => {
         toast={backupToast}
         onDismiss={dismissToast}
         onNavigateSettings={() => setActiveTab('settings')}
+      />
+
+      {/* Multi-Device Firestore Remote Print Queue Toast */}
+      <RemotePrintQueueToast 
+        settings={settings}
+        onNavigateKot={() => setActiveTab('kot')}
       />
 
       {/* Firebase Auth Modal */}

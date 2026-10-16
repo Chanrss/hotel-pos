@@ -252,11 +252,11 @@ export function calculateCoreBillingMetrics(
 }
 
 /**
- * Triggers a browser file download for a given text payload.
+ * Triggers a browser file download for a given text or binary payload.
  */
-export function triggerBlobDownload(filename: string, content: string, mimeType = 'application/json;charset=utf-8'): void {
+export function triggerBlobDownload(filename: string, content: BlobPart, mimeType = 'application/json;charset=utf-8'): void {
   try {
-    const blob = new Blob([content], { type: mimeType });
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
     const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
@@ -500,6 +500,10 @@ export async function downloadCoreBillingBackup(
     autoDownload: true
   });
 }
+
+// Re-export Excel (.xlsx) backup service for Daily Snapshot and reporting
+export { downloadDailyBillingExcel, exportDailyBillingExcelBackup } from './excelBackupService';
+export type { ExcelBackupOptions, ExcelBackupResult } from './excelBackupService';
 
 /**
  * Gathers all Firestore collections, formats them into a structured JSON backup,

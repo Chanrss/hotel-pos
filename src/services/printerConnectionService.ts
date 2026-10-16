@@ -244,21 +244,29 @@ export class PrinterConnectionService {
 
     // Auto-detect previously granted serial ports or USB devices
     if ('serial' in navigator && (navigator as any).serial?.getPorts) {
-      (navigator as any).serial.getPorts().then((ports: any[]) => {
-        if (ports && ports.length > 0 && !this.activeSerialPort) {
-          this.activeSerialPort = ports[0];
-          this.notifyHardwareChange();
-        }
-      }).catch(() => {});
+      try {
+        (navigator as any).serial.getPorts().then((ports: any[]) => {
+          if (ports && ports.length > 0 && !this.activeSerialPort) {
+            this.activeSerialPort = ports[0];
+            this.notifyHardwareChange();
+          }
+        }).catch(() => {});
+      } catch {
+        // Permissions policy blocks serial inside iframe preview
+      }
     }
 
     if ('usb' in navigator && (navigator as any).usb?.getDevices) {
-      (navigator as any).usb.getDevices().then((devices: any[]) => {
-        if (devices && devices.length > 0 && !this.activeUsbDevice) {
-          this.activeUsbDevice = devices[0];
-          this.notifyHardwareChange();
-        }
-      }).catch(() => {});
+      try {
+        (navigator as any).usb.getDevices().then((devices: any[]) => {
+          if (devices && devices.length > 0 && !this.activeUsbDevice) {
+            this.activeUsbDevice = devices[0];
+            this.notifyHardwareChange();
+          }
+        }).catch(() => {});
+      } catch {
+        // Permissions policy blocks USB inside iframe preview
+      }
     }
   }
 
@@ -308,9 +316,9 @@ export class PrinterConnectionService {
     const isBrowser = typeof window !== 'undefined';
     const isSandboxed = isBrowser && window.self !== window.top;
     return {
-      hasWebUsb: isBrowser && 'usb' in navigator,
-      hasWebSerial: isBrowser && 'serial' in navigator,
-      hasWebBluetooth: isBrowser && 'bluetooth' in navigator,
+      hasWebUsb: isBrowser && 'usb' in navigator && !isSandboxed,
+      hasWebSerial: isBrowser && 'serial' in navigator && !isSandboxed,
+      hasWebBluetooth: isBrowser && 'bluetooth' in navigator && !isSandboxed,
       isSandboxed
     };
   }
@@ -550,7 +558,14 @@ export class PrinterConnectionService {
    */
   static async connectSerial(baudRate?: number): Promise<{ success: boolean; deviceName?: string; error?: string }> {
     this.initializeListeners();
-    const { hasWebSerial } = this.getCapabilities();
+    const { hasWebSerial, isSandboxed } = this.getCapabilities();
+
+    if (isSandboxed) {
+      return {
+        success: false,
+        error: 'Hardware Serial / COM port access is blocked inside this preview container by browser security policies. Please click "Open in Tab" in the top header to run in a standalone browser window and pair your printer.'
+      };
+    }
 
     if (!hasWebSerial || !(navigator as any).serial) {
       return {
@@ -631,7 +646,14 @@ export class PrinterConnectionService {
    */
   static async connectUsb(): Promise<{ success: boolean; deviceName?: string; error?: string }> {
     this.initializeListeners();
-    const { hasWebUsb } = this.getCapabilities();
+    const { hasWebUsb, isSandboxed } = this.getCapabilities();
+
+    if (isSandboxed) {
+      return {
+        success: false,
+        error: 'Hardware USB device access is blocked inside this preview container by browser security policies. Please click "Open in Tab" in the top header to run in a standalone browser window and pair your printer.'
+      };
+    }
 
     if (!hasWebUsb || !(navigator as any).usb) {
       return {

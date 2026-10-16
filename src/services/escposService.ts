@@ -350,7 +350,7 @@ export class EscPosService {
     parts.push(0x1d, 0x21, 0x00, 0x1b, 0x45, 0x00);
     pushAscii('------------------------------------------------\n');
     pushAscii('1. CODE128 Bill Tracking Barcode:\n');
-    EscPosService.appendBarcodeBytes(parts, 'BN-2026-TEST');
+    EscPosService.appendBarcodeBytes(parts, 'BN-TEST-001');
     pushAscii('\n\n2. UPI / URL 2D QR Code:\n');
     EscPosService.appendQrCodeBytes(parts, 'https://hotelpos.rugtek.test/receipt/BN-001');
     pushAscii('\n\nHardware 2D Engine Verified!\n');

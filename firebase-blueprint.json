@@ -197,7 +197,14 @@
         "upiTotal": { "type": "number" },
         "kotCount": { "type": "number" },
         "totalDocuments": { "type": "number" },
-        "fileSizeBytes": { "type": "number" }
+        "fileSizeBytes": { "type": "number" },
+        "exportFormat": { "type": "string" },
+        "action": { "type": "string" },
+        "description": { "type": "string" },
+        "cardTotal": { "type": "number" },
+        "cancelledBillCount": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "errorMessage": { "type": "string" }
       },
       "required": ["id", "businessDate", "timestamp", "filename", "status", "scope"]
     },
@@ -268,6 +275,27 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "action", "targetUserId", "targetUserName", "performedByUid", "performedByName", "details", "timestamp", "createdAt"]
+    },
+    "PrintQueueJob": {
+      "title": "PrintQueueJob",
+      "description": "Firestore-based remote thermal print job queue triggered from secondary waiter mobile/tablet devices and executed by the primary POS counter terminal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobType": { "type": "string", "enum": ["KOT", "BILL", "REPRINT", "TEST"] },
+        "status": { "type": "string", "enum": ["PENDING", "PRINTING", "COMPLETED", "FAILED"] },
+        "sourceDeviceId": { "type": "string" },
+        "sourceDeviceName": { "type": "string" },
+        "sourceUserName": { "type": "string" },
+        "tableNumber": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "executedAt": { "type": "number" },
+        "executedByDeviceId": { "type": "string" },
+        "errorMessage": { "type": "string" }
+      },
+      "required": ["id", "jobType", "status", "sourceDeviceId", "referenceNumber", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -286,6 +314,10 @@
     "/print_logs/{logId}": {
       "schema": "PrintJobLog",
       "description": "Diagnostic telemetry logs for POS thermal print jobs"
+    },
+    "/print_queue/{jobId}": {
+      "schema": "PrintQueueJob",
+      "description": "Remote print job queue for multi-device waiter-to-counter thermal receipt printing"
     },
     "/daily_backups/{backupId}": {
       "schema": "DailyBackupRecord",

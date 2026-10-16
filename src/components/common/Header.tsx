@@ -20,13 +20,15 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Radio
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { RestaurantSettings } from '../../types';
 import { DEFAULT_RESTAURANT_LOGO, SRI_SARAVANA_BHAVAN_SVG } from '../../data/defaultLogo';
 import { getBusinessDate, formatBillNumber } from '../../services/billNumberEngine';
 import { getLocalBills } from '../../services/localBillStore';
+import { RemotePrintQueueService } from '../../services/remotePrintQueueService';
 import { NavTab } from './Sidebar';
 
 export interface HeaderProps {
@@ -50,6 +52,19 @@ export const Header: React.FC<HeaderProps> = ({
   const [time, setTime] = useState(new Date());
   const [currentBillNo, setCurrentBillNo] = useState<string>('01');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isPrintServer, setIsPrintServer] = useState(() => RemotePrintQueueService.isPrimaryPrintServer());
+
+  // Track Remote Print Server role
+  useEffect(() => {
+    const handleRoleChanged = (e: Event) => {
+      const custom = e as CustomEvent<{ isPrimary: boolean }>;
+      if (custom.detail) {
+        setIsPrintServer(custom.detail.isPrimary);
+      }
+    };
+    window.addEventListener('pos_print_server_role_changed', handleRoleChanged);
+    return () => window.removeEventListener('pos_print_server_role_changed', handleRoleChanged);
+  }, []);
 
   // Track Fullscreen State
   useEffect(() => {
@@ -317,6 +332,30 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label={isFullscreen ? 'Exit Full Screen' : 'Full Screen POS'}
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Print Server Mode Indicator & Quick Role Switcher */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isPrintServer;
+              setIsPrintServer(next);
+              RemotePrintQueueService.setPrimaryPrintServer(next);
+            }}
+            className={`h-6 px-2 rounded font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 border transition-all ${
+              isPrintServer
+                ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/60 text-emerald-300'
+                : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400'
+            }`}
+            title={
+              isPrintServer
+                ? 'Primary Print Server: ACTIVE (Listening for waiter KOT print jobs). Click to toggle to Waiter mode.'
+                : 'Waiter Client Mode (KOTs sent to Counter POS via Firestore). Click to become Print Server.'
+            }
+          >
+            <Radio className={`w-3 h-3 ${isPrintServer ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline">{isPrintServer ? 'Print Server ON' : 'Waiter Mode'}</span>
+            <span className="sm:hidden">{isPrintServer ? 'Server' : 'Waiter'}</span>
           </button>
 
           {/* Standalone Tab Button (Unlocks Native Hardware / WebSerial / System Spooler when in iframe) */}

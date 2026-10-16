@@ -390,7 +390,15 @@ export const DailyBackupSettingsCard: React.FC<DailyBackupSettingsCardProps> = (
                           </span>
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-400">
-                          {record.scope === 'CORE_BILLING' ? 'Core Billing' : 'Full DB'}
+                          {record.action === 'Export Excel' || record.exportFormat === 'Export Excel' || record.exportFormat === 'XLSX' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-500/15 text-teal-400 border border-teal-500/30">
+                              Export Excel
+                            </span>
+                          ) : record.scope === 'CORE_BILLING' ? (
+                            'Core Billing'
+                          ) : (
+                            'Full DB'
+                          )}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className="text-emerald-400 font-bold">{record.billCount} bills</span>

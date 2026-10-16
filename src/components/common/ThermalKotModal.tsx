@@ -1,7 +1,8 @@
-import React from 'react';
-import { Printer, X, ChefHat } from 'lucide-react';
+import React, { useState } from 'react';
+import { Printer, X, ChefHat, Radio, CheckCircle2 } from 'lucide-react';
 import { Kot, KotItem, RestaurantSettings } from '../../types';
 import { PrintService } from '../../services/PrintService';
+import { RemotePrintQueueService } from '../../services/remotePrintQueueService';
 
 interface ThermalKotModalProps {
   kot: Kot | null;
@@ -18,10 +19,26 @@ export const ThermalKotModal: React.FC<ThermalKotModalProps> = ({
   isOpen,
   onClose
 }) => {
+  const [remoteStatus, setRemoteStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+
   if (!isOpen || !kot) return null;
 
   const handlePrint = () => {
     void PrintService.printKot(kot, items, settings);
+  };
+
+  const handlePrintAtCounter = async () => {
+    setRemoteStatus('sending');
+    const res = await RemotePrintQueueService.queueRemoteKotPrint(kot, items, {
+      settings,
+      tableNumber: kot.tableNumber
+    });
+    if (res.success) {
+      setRemoteStatus('sent');
+      setTimeout(() => setRemoteStatus('idle'), 4000);
+    } else {
+      setRemoteStatus('idle');
+    }
   };
 
   const createdDate = new Date(kot.createdAt);
@@ -109,19 +126,44 @@ export const ThermalKotModal: React.FC<ThermalKotModalProps> = ({
         </div>
 
         {/* Modal Actions */}
-        <div className="p-3 bg-slate-900 border-t border-slate-800 flex justify-between gap-2">
+        <div className="p-3 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row justify-between gap-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
+            className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
           >
             Close
           </button>
+          
+          <button
+            onClick={handlePrintAtCounter}
+            disabled={remoteStatus !== 'idle'}
+            className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-75 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+            title="Trigger automatic print on Primary Counter Terminal via Firestore queue"
+          >
+            {remoteStatus === 'sent' ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                <span>Sent to Counter!</span>
+              </>
+            ) : remoteStatus === 'sending' ? (
+              <>
+                <Radio className="w-3.5 h-3.5 animate-spin" />
+                <span>Queueing...</span>
+              </>
+            ) : (
+              <>
+                <Radio className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Print at Counter POS</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handlePrint}
-            className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+            className="py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            Print KOT
+            <span>Print Local</span>
           </button>
         </div>
 

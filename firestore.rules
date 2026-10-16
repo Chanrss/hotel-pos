@@ -96,6 +96,10 @@ service cloud.firestore {
       allow read, create, update, delete: if true;
     }
 
+    match /print_queue/{jobId} {
+      allow read, write: if true;
+    }
+
     match /sync_metadata/{metaId} {
       allow read, write: if true;
     }

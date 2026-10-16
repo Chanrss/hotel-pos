@@ -15,7 +15,7 @@ export type PrintTransactionType = 'BILL' | 'KOT' | 'REPRINT' | 'TEST' | string;
 
 export interface LocalPrintTransactionRecord {
   id: string;
-  timestamp: string; // ISO 8601 formatted timestamp (e.g. 2026-09-24T14:15:30.123Z)
+  timestamp: string; // ISO 8601 formatted timestamp
   timeEpoch: number; // Unix timestamp in milliseconds for sorting & time difference math
   transactionId: string; // Bill Number, KOT Number, or transaction reference
   transactionType: PrintTransactionType;

@@ -24,7 +24,9 @@ import {
   CheckCircle,
   CheckSquare,
   Square,
-  ListChecks
+  ListChecks,
+  Radio,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -67,6 +69,7 @@ import {
   mergeKots, 
   subscribeToLocalKots 
 } from '../../services/localKotStore';
+import { RemotePrintQueueService } from '../../services/remotePrintQueueService';
 
 interface KotManagementProps {
   settings?: RestaurantSettings;
@@ -104,6 +107,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
   const [activeTab, setActiveTab] = useState<'running' | 'create' | 'queue'>(initialSubTab || 'running');
   const [queueFilter, setQueueFilter] = useState<'PENDING' | 'PRINTED' | 'ALL'>('PENDING');
   const [printingKotId, setPrintingKotId] = useState<string | null>(null);
+  const [remotePrintingKotId, setRemotePrintingKotId] = useState<string | null>(null);
   const [batchPrintingQueue, setBatchPrintingQueue] = useState(false);
 
   useEffect(() => {
@@ -483,12 +487,16 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
   };
 
   // Create or Append KOT
-  const handleCreateKot = async (printSlip = true) => {
+  const handleCreateKot = async (printMode: 'local' | 'counter' | 'none' | boolean = true) => {
     if (selectedItems.length === 0) {
       setNotification({ type: 'error', message: 'Please add at least one item to create KOT.' });
       setTimeout(() => setNotification(null), 3000);
       return;
     }
+
+    const shouldPrintLocal = printMode === true || printMode === 'local';
+    const shouldPrintCounter = printMode === 'counter';
+    const printSlip = shouldPrintLocal || shouldPrintCounter;
 
     setSubmitting(true);
     try {
@@ -497,7 +505,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
       // If appending to an existing KOT
       if (appendingKot) {
-        const initialPrintStatus = printSlip ? 'PRINTED' : 'PENDING';
+        const initialPrintStatus = shouldPrintLocal ? 'PRINTED' : 'PENDING';
         const newKotItems: KotItem[] = selectedItems.map((sel, idx) => ({
           id: `${appendingKot.id}_item_app_${now}_${idx + 1}`,
           kotId: appendingKot.id,
@@ -511,7 +519,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           notes: sel.notes || '',
           status: 'PENDING',
           printStatus: initialPrintStatus,
-          ...(printSlip ? { printedAt: now } : {}),
+          ...(shouldPrintLocal ? { printedAt: now } : {}),
           createdAt: now,
           updatedAt: now
         }));
@@ -523,7 +531,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         const updatedKot: Kot = {
           ...appendingKot,
           printStatus: hasAnyPending ? 'PENDING' : 'PRINTED',
-          ...(printSlip ? { printedAt: now, printCount: (appendingKot.printCount || 0) + 1 } : {}),
+          ...(shouldPrintLocal ? { printedAt: now, printCount: (appendingKot.printCount || 0) + 1 } : {}),
           items: combinedItems,
           itemsCount: combinedItems.reduce((sum, i) => sum + i.quantity, 0),
           updatedAt: now
@@ -537,14 +545,22 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           prev.map((k) => k.kot.id === appendingKot.id ? { kot: updatedKot, items: combinedItems } : k)
         );
 
-        // 3. Safe non-blocking print
-        if (printSlip) {
+        // 3. Execution: Local or Remote Counter Print
+        if (shouldPrintLocal) {
           void PrintService.printKot(updatedKot, newKotItems, settings);
+        } else if (shouldPrintCounter) {
+          void RemotePrintQueueService.queueRemoteKotPrint(updatedKot, newKotItems, {
+            sourceUserName: currentUser?.name || 'Waiter',
+            settings,
+            tableNumber: updatedKot.tableNumber
+          });
         }
 
         setNotification({
           type: 'success',
-          message: printSlip
+          message: shouldPrintCounter
+            ? `🚀 Appended ${selectedItems.length} item(s) to ${appendingKot.kotNumber} & queued to Counter POS Printer!`
+            : shouldPrintLocal
             ? `Added & printed ${selectedItems.length} items for ${appendingKot.kotNumber} (${appendingKot.tableNumber})!`
             : `Added ${selectedItems.length} items to ${appendingKot.kotNumber} — queued in Pending KOT print queue!`
         });
@@ -580,7 +596,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       // Brand New KOT
       const { kotNumber } = await allocateNextKotNumber(businessDate);
       const kotId = `kot_${now}_${Math.random().toString(36).substring(2, 6)}`;
-      const initialPrintStatus = printSlip ? 'PRINTED' : 'PENDING';
+      const initialPrintStatus = shouldPrintLocal ? 'PRINTED' : 'PENDING';
 
       const kotItems: KotItem[] = selectedItems.map((sel, idx) => ({
         id: `${kotId}_item_${idx + 1}`,
@@ -595,7 +611,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         notes: sel.notes || '',
         status: 'PENDING',
         printStatus: initialPrintStatus,
-        ...(printSlip ? { printedAt: now } : {}),
+        ...(shouldPrintLocal ? { printedAt: now } : {}),
         createdAt: now,
         updatedAt: now
       }));
@@ -610,7 +626,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
         waiterName: currentUser?.name || 'Waiter',
         status: 'OPEN',
         printStatus: initialPrintStatus,
-        ...(printSlip ? { printedAt: now, printCount: 1 } : { printCount: 0 }),
+        ...(shouldPrintLocal ? { printedAt: now, printCount: 1 } : { printCount: 0 }),
         items: kotItems,
         itemsCount: kotItems.reduce((sum, i) => sum + i.quantity, 0),
         createdBy: currentUser?.name || 'Staff',
@@ -624,15 +640,23 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       // 2. Update Local State Optimistically
       setRunningKots((prev) => [{ kot: newKot, items: kotItems }, ...prev.filter(k => k.kot.id !== newKot.id)]);
 
-      // 3. Safe non-blocking direct ESC/POS KOT print via PrintService
-      if (printSlip) {
+      // 3. Execution: Local or Remote Counter Print
+      if (shouldPrintLocal) {
         void PrintService.printKot(newKot, kotItems, settings);
+      } else if (shouldPrintCounter) {
+        void RemotePrintQueueService.queueRemoteKotPrint(newKot, kotItems, {
+          sourceUserName: currentUser?.name || 'Waiter',
+          settings,
+          tableNumber: newKot.tableNumber
+        });
       }
 
       // 4. UI Transition
       setNotification({
         type: 'success',
-        message: printSlip
+        message: shouldPrintCounter
+          ? `🚀 KOT ${kotNumber} created & sent to Counter POS Printer for ${newKot.tableNumber}!`
+          : shouldPrintLocal
           ? `KOT ${kotNumber} generated & sent to thermal printer for ${newKot.tableNumber}!`
           : `KOT ${kotNumber} added to Pending KOT print queue for ${newKot.tableNumber}!`
       });
@@ -657,6 +681,38 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       setNotification({ type: 'error', message: e.message || 'Failed to create KOT.' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Dedicated action for secondary/waiter devices to trigger thermal printing at primary counter
+  const handleSendKotToCounterPrinter = async (kot: Kot, items?: KotItem[]) => {
+    const effectiveItems = items && items.length > 0 ? items : kot.items || [];
+    setRemotePrintingKotId(kot.id);
+    try {
+      const res = await RemotePrintQueueService.queueRemoteKotPrint(kot, effectiveItems, {
+        sourceUserName: currentUser?.name || 'Waiter',
+        settings,
+        tableNumber: kot.tableNumber
+      });
+      if (res.success) {
+        setNotification({
+          type: 'success',
+          message: `🚀 KOT #${kot.kotNumber} queued to Counter POS Terminal Printer!`
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: res.error || 'Failed to queue KOT to counter printer.'
+        });
+      }
+    } catch (err: any) {
+      setNotification({
+        type: 'error',
+        message: err?.message || 'Error queueing KOT to counter printer'
+      });
+    } finally {
+      setRemotePrintingKotId(null);
+      setTimeout(() => setNotification(null), 3500);
     }
   };
 
@@ -1673,7 +1729,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             onClick={() => {
                               void handleSetKotPrintStatus(kot, effectiveItems, 'PRINTED', true);
                             }}
-                            className="px-2.5 py-1.5 h-7 sm:h-8 bg-slate-800 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-400 hover:text-amber-300 font-bold text-xs rounded-md border border-slate-700 hover:border-amber-500/50 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
+                            className="px-2 py-1.5 h-7 sm:h-8 bg-slate-800 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-400 hover:text-amber-300 font-bold text-xs rounded-md border border-slate-700 hover:border-amber-500/50 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
                             title={`Print physical thermal ticket for KOT #${kot.kotNumber} (Kitchen Preparation Ticket)`}
                           >
                             <Printer className="w-3.5 h-3.5 text-amber-400" />
@@ -1683,6 +1739,18 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                                 ×{kot.printCount}
                               </span>
                             ) : null}
+                          </button>
+
+                          {/* Secondary Waiter Trigger: Print at Counter POS via Firestore Queue */}
+                          <button
+                            type="button"
+                            disabled={remotePrintingKotId === kot.id}
+                            onClick={() => void handleSendKotToCounterPrinter(kot, effectiveItems)}
+                            className="px-2 py-1.5 h-7 sm:h-8 bg-emerald-950/60 hover:bg-emerald-900/80 active:bg-emerald-800/80 text-emerald-300 font-bold text-xs rounded-md border border-emerald-600/40 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
+                            title="Queue thermal print on Primary Counter Terminal via Firestore"
+                          >
+                            <Radio className={`w-3.5 h-3.5 text-emerald-400 ${remotePrintingKotId === kot.id ? 'animate-spin' : ''}`} />
+                            <span className="hidden xs:inline">{remotePrintingKotId === kot.id ? 'Queueing...' : 'To Counter'}</span>
                           </button>
 
                           {/* Direct Convert to Bill Button */}
@@ -1980,27 +2048,40 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          disabled={isCurrentlyPrinting}
-                          onClick={() =>
-                            handleSetKotPrintStatus(kot, items, 'PRINTED', true)
-                          }
-                          className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs ${
-                            isPending
-                              ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                              : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                          }`}
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>
-                            {isCurrentlyPrinting
-                              ? 'Printing...'
-                              : isPending
-                              ? 'Print KOT Now'
-                              : 'Reprint KOT'}
-                          </span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={remotePrintingKotId === kot.id}
+                            onClick={() => void handleSendKotToCounterPrinter(kot, items)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                            title="Queue thermal print on Primary POS Counter Terminal via Firestore"
+                          >
+                            <Radio className={`w-3.5 h-3.5 text-emerald-400 ${remotePrintingKotId === kot.id ? 'animate-spin' : ''}`} />
+                            <span>{remotePrintingKotId === kot.id ? 'Queueing...' : 'To Counter POS'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isCurrentlyPrinting}
+                            onClick={() =>
+                              handleSetKotPrintStatus(kot, items, 'PRINTED', true)
+                            }
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs ${
+                              isPending
+                                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                                : 'bg-slate-800 hover:bg-slate-700 text-white'
+                            }`}
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>
+                              {isCurrentlyPrinting
+                                ? 'Printing...'
+                                : isPending
+                                ? 'Print Local'
+                                : 'Reprint Local'}
+                            </span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2228,12 +2309,23 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
                   <button
                     type="button"
+                    onClick={() => handleCreateKot('counter')}
+                    disabled={submitting}
+                    className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-600/30 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
+                    title="Queue thermal print job on Primary Counter POS Terminal via Firestore"
+                  >
+                    <Radio className="w-3.5 h-3.5 text-white" />
+                    <span>{submitting ? '...' : 'To Counter'}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => handleCreateKot(false)}
                     disabled={submitting}
-                    className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white px-3.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-600/30 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
+                    className="bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-200 px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 border border-slate-700 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{submitting ? '...' : 'Send KOT'}</span>
+                    <Send className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Send</span>
                   </button>
                 </div>
               </div>
@@ -2464,27 +2556,40 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {/* Secondary action: Send KOT Only */}
                 <button
                   type="button"
                   onClick={() => handleCreateKot(false)}
                   disabled={selectedItems.length === 0 || submitting}
-                  className="py-2 px-2.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all active:scale-[0.98] touch-manipulation"
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-all active:scale-[0.98] touch-manipulation"
                 >
-                  <Send className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Send KOT Only</span>
+                  <Send className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span className="truncate">Send Only</span>
                 </button>
 
-                {/* Primary action: Send & Print KOT */}
+                {/* Secondary/Waiter action: Print at Counter POS */}
+                <button
+                  type="button"
+                  onClick={() => handleCreateKot('counter')}
+                  disabled={selectedItems.length === 0 || submitting}
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation"
+                  title="Queue thermal print on Primary Counter Terminal via Firestore queue"
+                >
+                  <Radio className="w-3.5 h-3.5 text-white shrink-0 animate-pulse" />
+                  <span className="truncate">To Counter</span>
+                </button>
+
+                {/* Primary action: Print Local KOT */}
                 <button
                   type="button"
                   onClick={() => handleCreateKot(true)}
                   disabled={selectedItems.length === 0 || submitting}
-                  className="py-2 px-2.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs sm:text-sm font-black bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation"
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation"
+                  title="Print directly to local thermal printer"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>Send & Print KOT</span>
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Print Local</span>
                 </button>
               </div>
             </div>

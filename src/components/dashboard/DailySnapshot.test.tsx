@@ -1,8 +1,28 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DailySnapshot } from './DailySnapshot';
 import { Bill, BillItem } from '../../types';
+
+vi.mock('../../services/backupService', () => ({
+  downloadCoreBillingBackup: vi.fn().mockResolvedValue({
+    success: true,
+    filename: 'Restaurant_billing_backup_2026-09-18.json',
+    record: { fileSizeBytes: 10240 }
+  }),
+  saveDailyBackupRecord: vi.fn().mockResolvedValue(undefined)
+}));
+
+vi.mock('../../services/excelBackupService', () => ({
+  downloadDailyBillingExcel: vi.fn().mockResolvedValue({
+    success: true,
+    filename: 'Restaurant_Daily_Backup_2026-09-18.xlsx',
+    fileSizeBytes: 20480
+  })
+}));
+
+import { downloadCoreBillingBackup } from '../../services/backupService';
+import { downloadDailyBillingExcel } from '../../services/excelBackupService';
 
 describe('DailySnapshot Component', () => {
   const businessDate = '2026-09-18';
@@ -235,5 +255,71 @@ describe('DailySnapshot Component', () => {
     const reportsBtn = screen.getByText('Detailed Reports');
     fireEvent.click(reportsBtn);
     expect(handleNavigate).toHaveBeenCalledWith('reports');
+  });
+
+  it('renders Download JSON Backup button with preserved id and triggers downloadCoreBillingBackup', async () => {
+    render(
+      <DailySnapshot
+        businessDate={businessDate}
+        bills={mockBills}
+      />
+    );
+
+    const jsonBtn = document.getElementById('snapshot-download-backup-btn');
+    expect(jsonBtn).toBeDefined();
+    expect(jsonBtn).not.toBeNull();
+
+    fireEvent.click(jsonBtn!);
+
+    await waitFor(() => {
+      expect(downloadCoreBillingBackup).toHaveBeenCalledWith(undefined, businessDate);
+    });
+
+    // Verification of feedback toast
+    await waitFor(() => {
+      expect(screen.getByText(/JSON backup downloaded successfully:/)).toBeDefined();
+    });
+  });
+
+  it('renders Export Excel Report button and triggers downloadDailyBillingExcel', async () => {
+    render(
+      <DailySnapshot
+        businessDate={businessDate}
+        bills={mockBills}
+      />
+    );
+
+    const excelBtn = document.getElementById('snapshot-export-excel-btn');
+    expect(excelBtn).toBeDefined();
+    expect(excelBtn).not.toBeNull();
+
+    fireEvent.click(excelBtn!);
+
+    await waitFor(() => {
+      expect(downloadDailyBillingExcel).toHaveBeenCalledWith(undefined, businessDate);
+    });
+
+    // Verification of feedback toast
+    await waitFor(() => {
+      expect(screen.getByText(/Excel report downloaded:/)).toBeDefined();
+    });
+  });
+
+  it('renders Export PDF Report button and opens the printable summary modal', () => {
+    render(
+      <DailySnapshot
+        businessDate={businessDate}
+        bills={mockBills}
+      />
+    );
+
+    const pdfBtn = document.getElementById('snapshot-export-pdf-btn');
+    expect(pdfBtn).toBeDefined();
+    expect(pdfBtn).not.toBeNull();
+
+    fireEvent.click(pdfBtn!);
+
+    expect(screen.getByText(/Daily Business Summary \(Print \/ PDF\)/)).toBeDefined();
+    expect(screen.getByText(/Print \/ Save as PDF/)).toBeDefined();
   });
 });

@@ -28,6 +28,7 @@ import { DEFAULT_RESTAURANT_LOGO } from '../../data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from '../../services/brandLogoService';
 import { PrintService } from '../../services/PrintService';
 import { LiveReceiptPreview } from './LiveReceiptPreview';
+import { RemotePrintServerCard } from './RemotePrintServerCard';
 
 interface SettingsViewProps {
   settings?: RestaurantSettings;
@@ -1220,6 +1221,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             onTestPrint={handleTestPrint}
             isPrintingSample={testPrintStatus.state === 'printing'}
             testPrintStatus={testPrintStatus}
+          />
+
+          {/* 7. MULTI-DEVICE REMOTE PRINT SERVER (FIRESTORE QUEUE) */}
+          <RemotePrintServerCard 
+            settings={formData}
+            onUpdateSettings={updateSettingsImmediate}
           />
 
           {/* SIMPLE PRINT DIAGNOSTIC STATUS */}
