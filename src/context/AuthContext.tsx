@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -8,11 +8,21 @@ import {
   signOut as fbSignOut, 
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { AppUser, Role, UserRole } from '../types';
 import { DEFAULT_RESTAURANT_LOGO } from '../data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from '../services/brandLogoService';
+import {
+  checkAccountLockout,
+  clearFailedPinAttempts,
+  hashPin,
+  purgePersistedLoginSession,
+  recordFailedPinAttempt,
+  recordSecurityAuditLog,
+  sanitizeUserForStorage,
+  verifyUserPin
+} from '../services/securityService';
 
 export const DEFAULT_PERMISSIONS = {
   ADMIN: [
@@ -35,8 +45,10 @@ export const DEFAULT_PERMISSIONS = {
     'inventory.edit',
     'reports.view',
     'reports.financial',
+    'reports.backup',
     'users.manage',
-    'settings.manage'
+    'settings.manage',
+    'security.manage'
   ],
   OWNER: [
     'dashboard.view',
@@ -58,8 +70,10 @@ export const DEFAULT_PERMISSIONS = {
     'inventory.edit',
     'reports.view',
     'reports.financial',
+    'reports.backup',
     'users.manage',
-    'settings.manage'
+    'settings.manage',
+    'security.manage'
   ],
   MANAGER: [
     'dashboard.view',
@@ -78,7 +92,9 @@ export const DEFAULT_PERMISSIONS = {
     'menu.edit',
     'menu.price',
     'inventory.view',
-    'reports.view'
+    'reports.view',
+    'reports.financial',
+    'reports.backup'
   ],
   WAITER: [
     'kot.create',
@@ -121,10 +137,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  // Requirement 1: Mandatory login every time the application opens or restarts.
+  // currentUser always starts as null and is never restored from browser storage.
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const isExplicitSessionAuthRef = useRef<boolean>(false);
 
   // Monitor network status
   useEffect(() => {
@@ -140,22 +159,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  // Monitor Firebase Auth state
+  // Requirement 1: Purge any saved login session / plain-text PINs on startup
+  // and automatically log out when the application is closed or restarted.
+  useEffect(() => {
+    purgePersistedLoginSession();
+
+    const handleAppCloseLogout = () => {
+      isExplicitSessionAuthRef.current = false;
+      purgePersistedLoginSession();
+    };
+
+    window.addEventListener('beforeunload', handleAppCloseLogout);
+    window.addEventListener('pagehide', handleAppCloseLogout);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleAppCloseLogout);
+      window.removeEventListener('pagehide', handleAppCloseLogout);
+    };
+  }, []);
+
+  // Monitor Firebase Auth state (only apply if user explicitly authenticated in this session)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
-      if (fbUser) {
-        // Fetch or create user record in Firestore
+      if (fbUser && isExplicitSessionAuthRef.current) {
         try {
           const userDocRef = doc(db, 'users', fbUser.uid);
           const userDocSnap = await getDoc(userDocRef);
 
           if (userDocSnap.exists()) {
-            const userData = userDocSnap.data() as AppUser;
+            const userData = sanitizeUserForStorage(userDocSnap.data() as AppUser);
             setCurrentUser(userData);
             await loadRole(userData.roleId);
           } else {
-            // First time login - if no users exist, default to OWNER
             const defaultUser: AppUser = {
               uid: fbUser.uid,
               name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
@@ -172,7 +208,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (err) {
           console.error('Error fetching user profile:', err);
-          // Fallback to owner for seamless dev flow
           const fallbackUser: AppUser = {
             uid: fbUser.uid,
             name: fbUser.email?.split('@')[0] || 'Admin Owner',
@@ -185,25 +220,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setCurrentUser(fallbackUser);
           await loadRole('owner');
         }
-      } else {
-        if (localStorage.getItem('pos_logged_out') === 'true') {
-          setCurrentUser(null);
-          setCurrentRole(null);
-          setLoading(false);
-          return;
-        }
-        const savedUserStr = localStorage.getItem('pos_logged_in_user');
-        if (savedUserStr) {
-          try {
-            const savedUser = JSON.parse(savedUserStr) as AppUser;
-            setCurrentUser(savedUser);
-            await loadRole(savedUser.roleId || 'admin');
-            setLoading(false);
-            return;
-          } catch (e) {}
-        }
-        const savedDemoRole = (localStorage.getItem('pos_demo_role') as UserRole) || 'admin';
-        applyDemoUser(savedDemoRole);
+      } else if (!isExplicitSessionAuthRef.current) {
+        // Do NOT auto-login from saved credentials or previous sessions
+        setCurrentUser(null);
+        setCurrentRole(null);
       }
       setLoading(false);
     });
@@ -213,30 +233,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const applyDemoUser = (role: UserRole) => {
     const rawLower = role.toLowerCase();
-    const lowerRole = (rawLower === 'admin' || rawLower === 'owner') ? 'admin' : rawLower as 'manager' | 'waiter';
+    const lowerRole = (rawLower === 'admin' || rawLower === 'owner') ? 'owner' : rawLower as 'manager' | 'waiter';
     const names = {
-      admin: 'Admin',
-      manager: 'Restaurant Manager',
+      owner: 'Owner',
+      manager: 'Store Manager',
       waiter: 'Floor Waiter'
     };
 
     const demoUser: AppUser = {
       uid: `user_${lowerRole}`,
       username: lowerRole,
-      name: names[lowerRole] || 'Admin',
+      name: names[lowerRole] || 'Owner',
       email: `${lowerRole}@hotelpos.local`,
       roleId: lowerRole,
-      fullAccess: lowerRole === 'admin',
+      fullAccess: lowerRole === 'owner',
       active: true,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
+    isExplicitSessionAuthRef.current = true;
     setCurrentUser(demoUser);
     setCurrentRole({
       id: lowerRole,
       name: lowerRole.toUpperCase(),
-      permissions: DEFAULT_PERMISSIONS[lowerRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] || DEFAULT_PERMISSIONS.ADMIN,
+      permissions: DEFAULT_PERMISSIONS[lowerRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] || DEFAULT_PERMISSIONS.OWNER,
       active: true
     });
   };
@@ -272,8 +293,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
+      isExplicitSessionAuthRef.current = true;
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) {
+      isExplicitSessionAuthRef.current = false;
       setLoading(false);
       throw err;
     }
@@ -282,6 +305,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (email: string, pass: string, name: string, roleId: string) => {
     setLoading(true);
     try {
+      isExplicitSessionAuthRef.current = true;
       const res = await createUserWithEmailAndPassword(auth, email, pass);
       const newUser: AppUser = {
         uid: res.user.uid,
@@ -297,6 +321,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCurrentUser(newUser);
       await loadRole(roleId);
     } catch (err: any) {
+      isExplicitSessionAuthRef.current = false;
       setLoading(false);
       throw err;
     }
@@ -305,13 +330,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loginWithGoogle = async () => {
     setLoading(true);
     try {
+      isExplicitSessionAuthRef.current = true;
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
       const userRef = doc(db, 'users', res.user.uid);
       try {
         const snap = await getDoc(userRef);
         if (snap.exists()) {
-          const uData = snap.data() as AppUser;
+          const uData = sanitizeUserForStorage(snap.data() as AppUser);
           setCurrentUser(uData);
           await loadRole(uData.roleId || 'owner');
         } else {
@@ -348,6 +374,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await loadRole('owner');
       }
     } catch (err: any) {
+      isExplicitSessionAuthRef.current = false;
       setLoading(false);
       throw err;
     }
@@ -367,22 +394,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           localList.push(
-            ...parsed.filter((u: any) => !u.deleted && !deletedIds.includes(u.uid))
+            ...parsed
+              .filter((u: any) => !u.deleted && !deletedIds.includes(u.uid))
+              .map((u: AppUser) => sanitizeUserForStorage(u))
           );
         }
       }
     } catch (e) {}
 
+    // Default staff accounts store only cryptographic pinHash (never plain-text PIN)
     const defaultStaff: AppUser[] = [
       {
         uid: 'user_admin',
         username: 'admin',
-        pin: '1234',
-        name: 'Admin',
+        pinHash: hashPin('1234', 'admin'),
+        name: 'Owner (Admin)',
         email: 'admin@hotelpos.local',
-        roleId: 'admin',
+        roleId: 'owner',
         fullAccess: true,
-        permissions: DEFAULT_PERMISSIONS.ADMIN,
+        permissions: DEFAULT_PERMISSIONS.OWNER,
         active: true,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -390,8 +420,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {
         uid: 'user_owner',
         username: 'owner',
-        pin: '1234',
-        name: 'Admin',
+        pinHash: hashPin('1234', 'owner'),
+        name: 'Restaurant Owner',
         email: 'owner@hotelpos.local',
         roleId: 'owner',
         fullAccess: true,
@@ -403,9 +433,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {
         uid: 'user_manager',
         username: 'manager',
-        pin: '5678',
-        name: 'Restaurant Manager',
+        pinHash: hashPin('5678', 'manager'),
+        name: 'Store Manager',
         email: 'manager@hotelpos.local',
+        roleId: 'manager',
+        fullAccess: false,
+        permissions: DEFAULT_PERMISSIONS.MANAGER,
+        active: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      },
+      {
+        uid: 'user_store_manager',
+        username: 'storemanager',
+        pinHash: hashPin('5678', 'storemanager'),
+        name: 'Store Manager',
+        email: 'storemanager@hotelpos.local',
         roleId: 'manager',
         fullAccess: false,
         permissions: DEFAULT_PERMISSIONS.MANAGER,
@@ -416,7 +459,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {
         uid: 'user_cashier',
         username: 'cashier',
-        pin: '1111',
+        pinHash: hashPin('1111', 'cashier'),
         name: 'Counter Cashier',
         email: 'cashier@hotelpos.local',
         roleId: 'manager',
@@ -429,7 +472,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       {
         uid: 'user_waiter',
         username: 'waiter',
-        pin: '0000',
+        pinHash: hashPin('0000', 'waiter'),
         name: 'Floor Waiter',
         email: 'waiter@hotelpos.local',
         roleId: 'waiter',
@@ -447,7 +490,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       snap.forEach((d) => {
         const data = d.data() as any;
         if (!data.deleted && !deletedIds.includes(d.id)) {
-          firestoreUsers.push({ uid: d.id, ...data } as AppUser);
+          firestoreUsers.push(sanitizeUserForStorage({ uid: d.id, ...data } as AppUser));
         }
       });
       if (firestoreUsers.length > 0) {
@@ -477,39 +520,88 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const cleanPin = pin.trim();
 
       if (!cleanUser || !cleanPin) {
-        throw new Error('Please enter both username and PIN.');
+        throw new Error('Username and PIN are both mandatory to log in.');
+      }
+
+      // Check rate limiting & temporary account lockout
+      const lockoutStatus = checkAccountLockout(cleanUser);
+      if (lockoutStatus.isLocked) {
+        const mins = Math.ceil(lockoutStatus.remainingSeconds / 60);
+        throw new Error(
+          `Account "@${cleanUser}" is temporarily locked due to repeated incorrect PIN attempts. Please try again in ${mins} minute(s) (${lockoutStatus.remainingSeconds}s).`
+        );
       }
 
       const allStaff = await getKnownStaffList();
-      const matched = allStaff.find(
-        (u) => 
-          (u.username?.toLowerCase() === cleanUser || u.email?.toLowerCase().startsWith(cleanUser)) &&
-          (u.pin === cleanPin || (!u.pin && cleanPin === '1234'))
+      const userRecord = allStaff.find(
+        (u) =>
+          u.username?.toLowerCase() === cleanUser ||
+          u.email?.toLowerCase().startsWith(`${cleanUser}@`)
       );
 
-      if (!matched) {
-        throw new Error('Invalid username or PIN. Please check your credentials.');
+      if (!userRecord) {
+        const failState = await recordFailedPinAttempt(cleanUser);
+        if (failState.isLocked) {
+          throw new Error(
+            `Too many failed login attempts. Account "@${cleanUser}" is temporarily locked for 5 minutes.`
+          );
+        }
+        throw new Error(
+          `Invalid username or PIN. (${failState.remainingAttempts} attempt(s) remaining before temporary lockout)`
+        );
       }
 
-      if (matched.active === false) {
-        throw new Error('This staff account is currently inactive.');
+      const isPinValid =
+        verifyUserPin(cleanPin, userRecord) ||
+        (!userRecord.pinHash && !userRecord.pin && cleanPin === '1234');
+
+      if (!isPinValid) {
+        const failState = await recordFailedPinAttempt(cleanUser);
+        if (failState.isLocked) {
+          throw new Error(
+            `Account "@${cleanUser}" has been temporarily locked for 5 minutes after 5 incorrect PIN attempts.`
+          );
+        }
+        throw new Error(
+          `Invalid username or PIN. (${failState.remainingAttempts} attempt(s) remaining before temporary lockout)`
+        );
       }
 
-      const updatedUser: AppUser = {
-        ...matched,
-        lastLoginAt: Date.now(),
-        updatedAt: Date.now()
-      };
+      if (userRecord.active === false) {
+        throw new Error('This staff account is currently inactive. Please contact the Owner.');
+      }
+
+      await clearFailedPinAttempts(cleanUser);
+
+      // Sanitize user so plain-text PIN is never stored in memory, localStorage, or Firestore
+      const updatedUser: AppUser = sanitizeUserForStorage(
+        {
+          ...userRecord,
+          lastLoginAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        cleanPin
+      );
 
       try {
         await setDoc(doc(db, 'users', updatedUser.uid), updatedUser, { merge: true });
       } catch (e) {}
 
-      localStorage.removeItem('pos_logged_out');
-      localStorage.setItem('pos_logged_in_user', JSON.stringify(updatedUser));
-      localStorage.setItem('pos_demo_role', updatedUser.roleId.toLowerCase());
+      // Requirement 1: Never persist login session or PINs in localStorage/sessionStorage
+      purgePersistedLoginSession();
+      isExplicitSessionAuthRef.current = true;
       setCurrentUser(updatedUser);
       await loadRole(updatedUser.roleId);
+
+      await recordSecurityAuditLog({
+        eventType: 'LOGIN_SUCCESS',
+        username: updatedUser.username || cleanUser,
+        userId: updatedUser.uid,
+        role: updatedUser.roleId,
+        status: 'SUCCESS',
+        details: `Authenticated login by "${updatedUser.name}" (@${updatedUser.username || cleanUser}) with role ${updatedUser.roleId.toUpperCase()}.`
+      });
+
       return updatedUser;
     } finally {
       setLoading(false);
@@ -524,9 +616,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     options?: { fullAccess?: boolean; permissions?: string[] }
   ): Promise<AppUser> => {
     const callerRole = currentUser?.roleId?.toLowerCase();
-    const callerIsAdmin = callerRole === 'admin' || callerRole === 'owner' || Boolean(currentUser?.fullAccess);
-    if (!callerIsAdmin) {
-      throw new Error('Only the Admin account can register new users.');
+    const callerIsOwner =
+      callerRole === 'admin' || callerRole === 'owner' || Boolean(currentUser?.fullAccess);
+    if (!callerIsOwner) {
+      await recordSecurityAuditLog({
+        eventType: 'UNAUTHORIZED_ACCESS_BLOCKED',
+        username: currentUser?.username || 'unknown',
+        userId: currentUser?.uid,
+        role: currentUser?.roleId,
+        status: 'BLOCKED',
+        details: 'Non-owner attempted to register a new staff user.'
+      });
+      throw new Error('Only the Owner account can register new users or manage security settings.');
     }
 
     setLoading(true);
@@ -535,8 +636,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const cleanPin = pin.trim();
       const cleanName = name.trim() || cleanUser;
 
-      if (!cleanUser || cleanUser.length < 2) throw new Error('Username must be at least 2 alphanumeric characters.');
-      if (!cleanPin || cleanPin.length < 4) throw new Error('PIN must be at least 4 digits.');
+      if (!cleanUser || cleanUser.length < 2) {
+        throw new Error('Username must be at least 2 alphanumeric characters.');
+      }
+      if (!cleanPin || cleanPin.length < 4) {
+        throw new Error('PIN must be at least 4 digits.');
+      }
 
       const allStaff = await getKnownStaffList();
       const existing = allStaff.find((u) => u.username?.toLowerCase() === cleanUser);
@@ -545,27 +650,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const normRole = roleId.toLowerCase();
-      const isNewUserAdmin = options?.fullAccess !== undefined
-        ? options.fullAccess
-        : (normRole === 'admin' || normRole === 'owner');
+      const isNewUserOwner =
+        options?.fullAccess !== undefined
+          ? options.fullAccess
+          : normRole === 'admin' || normRole === 'owner';
       const defaultPerms =
         options?.permissions ||
         DEFAULT_PERMISSIONS[normRole.toUpperCase() as keyof typeof DEFAULT_PERMISSIONS] ||
         DEFAULT_PERMISSIONS.WAITER;
 
-      const newUser: AppUser = {
-        uid: `user_${cleanUser}`,
-        username: cleanUser,
-        pin: cleanPin,
-        name: cleanName,
-        email: `${cleanUser}@hotelpos.local`,
-        roleId: normRole,
-        fullAccess: isNewUserAdmin,
-        permissions: isNewUserAdmin ? DEFAULT_PERMISSIONS.ADMIN : defaultPerms,
-        active: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
+      // Filter out owner-only permissions if the user is not an Owner
+      const sanitizedPermissions = isNewUserOwner
+        ? DEFAULT_PERMISSIONS.OWNER
+        : defaultPerms.filter(
+            (p) => p !== 'users.manage' && p !== 'settings.manage' && p !== 'security.manage'
+          );
+
+      const newUser: AppUser = sanitizeUserForStorage(
+        {
+          uid: `user_${cleanUser}`,
+          username: cleanUser,
+          pinHash: hashPin(cleanPin, cleanUser),
+          name: cleanName,
+          email: `${cleanUser}@hotelpos.local`,
+          roleId: normRole,
+          fullAccess: isNewUserOwner,
+          permissions: sanitizedPermissions,
+          active: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        },
+        cleanPin
+      );
 
       try {
         await setDoc(doc(db, 'users', newUser.uid), newUser);
@@ -573,7 +689,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn('Firestore user registration notice (saving locally):', e);
       }
 
-      const currentLocals = allStaff.filter((u) => u.uid !== newUser.uid);
+      const currentLocals = allStaff
+        .filter((u) => u.uid !== newUser.uid)
+        .map((u) => sanitizeUserForStorage(u));
       localStorage.setItem('pos_local_users', JSON.stringify([...currentLocals, newUser]));
       return newUser;
     } finally {
@@ -582,18 +700,64 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    localStorage.removeItem('pos_logged_in_user');
-    localStorage.setItem('pos_logged_out', 'true');
-    if (firebaseUser) {
-      await fbSignOut(auth);
-    }
+    const prevUser = currentUser;
+    isExplicitSessionAuthRef.current = false;
+    purgePersistedLoginSession();
     setCurrentUser(null);
     setCurrentRole(null);
+
+    if (prevUser) {
+      await recordSecurityAuditLog({
+        eventType: 'LOGOUT',
+        username: prevUser.username || prevUser.name || prevUser.uid,
+        userId: prevUser.uid,
+        role: prevUser.roleId,
+        status: 'SUCCESS',
+        details: `User "${prevUser.name}" (@${prevUser.username || prevUser.uid}) logged out securely.`
+      });
+    }
+
+    if (firebaseUser) {
+      try {
+        await fbSignOut(auth);
+      } catch {}
+    }
   };
 
+  // Requirement 7: Automatically lock the application after inactivity
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const getTimeoutMs = (): number => {
+      try {
+        const storedMins = Number(localStorage.getItem('pos_inactivity_timeout_mins'));
+        if (!isNaN(storedMins) && storedMins >= 1 && storedMins <= 240) {
+          return storedMins * 60 * 1000;
+        }
+      } catch {}
+      return 15 * 60 * 1000; // Default 15 minutes
+    };
+
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        logout();
+      }, getTimeoutMs());
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      events.forEach((evt) => window.removeEventListener(evt, resetIdleTimer));
+    };
+  }, [currentUser?.uid]);
+
   const switchDemoRole = (role: UserRole) => {
-    localStorage.removeItem('pos_logged_out');
-    localStorage.setItem('pos_demo_role', role.toLowerCase());
     applyDemoUser(role);
   };
 
@@ -601,12 +765,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     currentUser?.roleId?.toLowerCase() === 'owner' ||
     currentUser?.roleId?.toLowerCase() === 'admin' ||
     Boolean(currentUser?.fullAccess);
-  const isManager = currentUser?.roleId?.toLowerCase() === 'manager' || isOwner;
+  const isManager =
+    currentUser?.roleId?.toLowerCase() === 'manager' ||
+    currentUser?.roleId?.toLowerCase() === 'store_manager' ||
+    isOwner;
   const isWaiter = currentUser?.roleId?.toLowerCase() === 'waiter' && !isOwner;
 
   const hasPermission = (perm: string): boolean => {
-    if (!currentUser) return false;
-    if (isOwner) return true; // Admin / Full Access account has unrestricted access
+    if (!currentUser || currentUser.active === false) return false;
+    if (isOwner) return true; // Owner account has full unrestricted access
+
+    // Store Manager and non-owners never have access to Owner-only user management or security settings
+    if (
+      perm === 'users.manage' ||
+      perm === 'settings.manage' ||
+      perm === 'security.manage'
+    ) {
+      return false;
+    }
+
     if (Array.isArray(currentUser.permissions)) {
       if (currentUser.permissions.includes('all') || currentUser.permissions.includes(perm)) {
         return true;

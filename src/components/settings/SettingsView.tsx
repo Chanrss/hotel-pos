@@ -19,7 +19,10 @@ import {
   Minus,
   Plus,
   LayoutTemplate,
-  Eye
+  Eye,
+  Maximize2,
+  Sliders,
+  Palette
 } from 'lucide-react';
 import { RestaurantSettings } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
@@ -29,10 +32,13 @@ import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from '../../ser
 import { PrintService } from '../../services/PrintService';
 import { LiveReceiptPreview } from './LiveReceiptPreview';
 import { RemotePrintServerCard } from './RemotePrintServerCard';
+import { purgeAllBills } from '../../services/billCleanupService';
+import { POS_THEMES, PosThemeId, getSavedPosTheme, applyPosTheme } from '../../services/posThemeService';
 
 interface SettingsViewProps {
   settings?: RestaurantSettings;
   onRefreshSettings?: () => void;
+  onNavigateTab?: (tab: any) => void;
 }
 
 type AlignOption = 'left' | 'center' | 'right';
@@ -103,10 +109,33 @@ async function optimizeLogoForThermalReceipt(file: File): Promise<string> {
   });
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSettings, onRefreshSettings }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSettings, onRefreshSettings, onNavigateTab }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const firebaseSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobilePreviewPinned, setMobilePreviewPinned] = useState(false);
+  const [activeThemeId, setActiveThemeId] = useState<PosThemeId>(() => getSavedPosTheme());
+  const [inactivityTimeoutMins, setInactivityTimeoutMins] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('pos_inactivity_timeout_mins');
+      return saved !== null ? Number(saved) : 15;
+    } catch (_) {
+      return 15;
+    }
+  });
+  const [defaultPricingTier, setDefaultPricingTier] = useState<'NON_AC' | 'AC'>(() => {
+    try {
+      return localStorage.getItem('pos_default_pricing_tier') === 'AC' ? 'AC' : 'NON_AC';
+    } catch (_) {
+      return 'NON_AC';
+    }
+  });
+  const [dailyBackupClosingTime, setDailyBackupClosingTime] = useState<string>(() => {
+    try {
+      return localStorage.getItem('pos_daily_backup_closing_time') || '23:30';
+    } catch (_) {
+      return '23:30';
+    }
+  });
 
   const buildSanitizedSettingsPayload = (raw: RestaurantSettings): RestaurantSettings => {
     const isLogoRemoved = Boolean(raw.logoRemoved);
@@ -222,6 +251,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       receiptShowPhone: merged.receiptShowPhone !== false,
       receiptShowItemSl: merged.receiptShowItemSl !== false,
       receiptShowTotalQty: merged.receiptShowTotalQty !== false,
+      receiptMarginTop: typeof merged.receiptMarginTop === 'number' ? merged.receiptMarginTop : 2,
+      receiptMarginBottom: typeof merged.receiptMarginBottom === 'number' ? merged.receiptMarginBottom : 4,
+      receiptMarginLeft: typeof merged.receiptMarginLeft === 'number' ? merged.receiptMarginLeft : 2,
+      receiptMarginRight: typeof merged.receiptMarginRight === 'number' ? merged.receiptMarginRight : 2,
       autoPrintOnSave: true,
       updatedAt: Date.now()
     };
@@ -233,6 +266,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
     state: 'idle' | 'printing' | 'success' | 'failed';
     message?: string;
   }>({ state: 'idle' });
+
+  const [showEraseBillsModal, setShowEraseBillsModal] = useState(false);
+  const [erasingBills, setErasingBills] = useState(false);
+
+  const handleEraseAllBillsInSettings = async () => {
+    setErasingBills(true);
+    try {
+      const res = await purgeAllBills();
+      setShowEraseBillsModal(false);
+      setNotification({
+        type: 'success',
+        message: `All bills erased successfully (${res.billsDeleted} deleted). Next bill will start from #01!`
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } catch (e: any) {
+      setNotification({
+        type: 'error',
+        message: 'Failed to erase bills: ' + (e?.message || 'Unknown error')
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } finally {
+      setErasingBills(false);
+    }
+  };
 
   const [diagState, setDiagState] = useState(() => PrintService.getDiagnosticStatus());
 
@@ -279,7 +336,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           boldGrandTotal: initialSettings.boldGrandTotal !== undefined ? initialSettings.boldGrandTotal : (prev.boldGrandTotal ?? true),
           boldFooter: initialSettings.boldFooter !== undefined ? initialSettings.boldFooter : (prev.boldFooter ?? true),
           watermarkEnabled: initialSettings.watermarkEnabled !== undefined ? initialSettings.watermarkEnabled : (prev.watermarkEnabled ?? true),
-          watermarkUseLogo: initialSettings.watermarkUseLogo !== undefined ? initialSettings.watermarkUseLogo : (prev.watermarkUseLogo ?? true)
+          watermarkUseLogo: initialSettings.watermarkUseLogo !== undefined ? initialSettings.watermarkUseLogo : (prev.watermarkUseLogo ?? true),
+          receiptMarginTop: typeof initialSettings.receiptMarginTop === 'number' ? initialSettings.receiptMarginTop : (prev.receiptMarginTop ?? 2),
+          receiptMarginBottom: typeof initialSettings.receiptMarginBottom === 'number' ? initialSettings.receiptMarginBottom : (prev.receiptMarginBottom ?? 4),
+          receiptMarginLeft: typeof initialSettings.receiptMarginLeft === 'number' ? initialSettings.receiptMarginLeft : (prev.receiptMarginLeft ?? 2),
+          receiptMarginRight: typeof initialSettings.receiptMarginRight === 'number' ? initialSettings.receiptMarginRight : (prev.receiptMarginRight ?? 2)
         };
         formDataRef.current = nextState;
         return nextState;
@@ -298,8 +359,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       localStorage.setItem('pos_restaurant_settings', JSON.stringify(synced));
       window.dispatchEvent(new CustomEvent('pos-settings-updated', { detail: synced }));
       const printRoot = document.getElementById('pos-print-root');
-      if (printRoot && synced.receiptFontSize) {
-        printRoot.style.setProperty('--receipt-base-font-size', `${synced.receiptFontSize}px`);
+      if (printRoot) {
+        if (synced.receiptFontSize) {
+          printRoot.style.setProperty('--receipt-base-font-size', `${synced.receiptFontSize}px`);
+        }
+        if (typeof synced.receiptMarginTop === 'number') {
+          printRoot.style.setProperty('--receipt-margin-top', `${synced.receiptMarginTop}mm`);
+        }
+        if (typeof synced.receiptMarginBottom === 'number') {
+          printRoot.style.setProperty('--receipt-margin-bottom', `${synced.receiptMarginBottom}mm`);
+        }
+        if (typeof synced.receiptMarginLeft === 'number') {
+          printRoot.style.setProperty('--receipt-margin-left', `${synced.receiptMarginLeft}mm`);
+        }
+        if (typeof synced.receiptMarginRight === 'number') {
+          printRoot.style.setProperty('--receipt-margin-right', `${synced.receiptMarginRight}mm`);
+        }
       }
     } catch (_) {}
 
@@ -471,19 +546,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 p-3 sm:p-4 gap-3.5 overflow-y-auto md:overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0F172A] text-slate-100 p-3 sm:p-4 gap-3.5 overflow-y-auto md:overflow-hidden font-sans">
       {/* Top Bar */}
-      <div className="bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg shrink-0">
+      <div className="bg-[#1E293B] border border-slate-700/80 px-4 py-3 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+          <div className="p-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400">
             <Printer className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-bold text-base sm:text-lg text-white">
-              Printer &amp; Receipt Settings
+            <h2 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
+              System, Printer &amp; Receipt Settings
             </h2>
             <p className="text-xs text-slate-400">
-              Real-time 3-inch thermal receipt layout, alignment, watermark positioning &amp; test printing
+              Restaurant details, 3-inch thermal receipt layout, security auto-lock, backup schedule &amp; AC/Non-AC pricing
             </p>
           </div>
         </div>
@@ -503,9 +578,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             id="btn-header-test-print"
             onClick={handleTestPrint}
             disabled={testPrintStatus.state === 'printing'}
-            className="px-3.5 py-2 text-xs sm:text-sm font-bold text-amber-300 hover:text-amber-200 bg-amber-950/50 hover:bg-amber-900/60 border border-amber-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            <Printer className="w-4 h-4 text-amber-400" />
+            <Printer className="w-4 h-4 text-emerald-400" />
             <span>{testPrintStatus.state === 'printing' ? 'Printing...' : 'TEST PRINT'}</span>
           </button>
 
@@ -563,6 +638,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:flex-1 md:min-h-0 md:overflow-hidden">
         {/* Left Column: Receipt & Printer Controls (7 cols, independently scrollable) */}
         <div className="md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto md:pr-1.5 pb-6">
+          {/* 0. POS COLOR COMBINATION STUDIO */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3.5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-emerald-400" />
+                <div>
+                  <h3 className="font-bold text-sm text-white">POS Color Combination &amp; Theme</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Instantly switch the entire POS interface colour combination across all screens
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-mono text-emerald-400 font-bold">
+                {(POS_THEMES.find((t) => t.id === activeThemeId) || POS_THEMES[0]).name}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {POS_THEMES.map((theme) => {
+                const isSelected = theme.id === activeThemeId;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveThemeId(theme.id);
+                      applyPosTheme(theme.id);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-white truncate">{theme.name}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 truncate">{theme.subtitle}</div>
+                    </div>
+                    <div className="flex items-center -space-x-1.5 shrink-0">
+                      {theme.swatches.map((hex, idx) => (
+                        <span
+                          key={idx}
+                          className="w-5 h-5 rounded-full border-2 border-slate-900 shadow-xs"
+                          style={{ backgroundColor: hex }}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* 1. RECEIPT LAYOUT & DENSITY */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -786,7 +914,306 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
             </div>
           </div>
 
-          {/* 3. SHOP LOGO & WATERMARK POSITION */}
+          {/* 3. CUSTOM MARGIN CONTROLS (TOP, BOTTOM, LEFT, RIGHT) FOR THERMAL PRINTER CALIBRATION */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Maximize2 className="w-4 h-4 text-amber-400" />
+                <h3 className="font-bold text-sm text-white">Custom Margins (Print Calibration)</h3>
+              </div>
+              <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
+                T:{formData.receiptMarginTop ?? 2}mm · B:{formData.receiptMarginBottom ?? 4}mm · L:{formData.receiptMarginLeft ?? 2}mm · R:{formData.receiptMarginRight ?? 2}mm
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Fine-tune thermal roll margins (in millimeters) to eliminate cut-off text, compensate for hardware tear-cutter bars, or maximize printable width.
+            </p>
+
+            {/* Quick Calibration Presets */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[11px] font-semibold text-slate-400 mr-1 flex items-center gap-1">
+                <Sliders className="w-3 h-3 text-amber-400" /> Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    receiptMarginTop: 2,
+                    receiptMarginBottom: 4,
+                    receiptMarginLeft: 2,
+                    receiptMarginRight: 2
+                  }))
+                }
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+              >
+                Default (Balanced)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    receiptMarginTop: 0,
+                    receiptMarginBottom: 2,
+                    receiptMarginLeft: 0,
+                    receiptMarginRight: 0
+                  }))
+                }
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+              >
+                Zero (Edge-to-Edge)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    receiptMarginTop: 1,
+                    receiptMarginBottom: 4,
+                    receiptMarginLeft: 1.5,
+                    receiptMarginRight: 1.5
+                  }))
+                }
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+              >
+                Rugtek / TVS (80mm)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    receiptMarginTop: 3,
+                    receiptMarginBottom: 6,
+                    receiptMarginLeft: 3,
+                    receiptMarginRight: 3
+                  }))
+                }
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors cursor-pointer"
+              >
+                Epson / Wide Margin
+              </button>
+            </div>
+
+            {/* 4 Interactive Steppers & Sliders Grid: Top, Bottom, Left, Right */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* TOP MARGIN */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <label htmlFor="receipt-margin-top" className="font-semibold text-slate-200">
+                    Top Margin
+                  </label>
+                  <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded text-xs">
+                    {formData.receiptMarginTop ?? 2} mm
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginTop: Math.max(0, (prev.receiptMarginTop ?? 2) - 1)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    -
+                  </button>
+                  <input
+                    id="receipt-margin-top"
+                    type="range"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={formData.receiptMarginTop ?? 2}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginTop: Number(e.target.value)
+                      }))
+                    }
+                    className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginTop: Math.min(20, (prev.receiptMarginTop ?? 2) + 1)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* BOTTOM MARGIN */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <label htmlFor="receipt-margin-bottom" className="font-semibold text-slate-200">
+                    Bottom Margin (Paper Feed)
+                  </label>
+                  <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded text-xs">
+                    {formData.receiptMarginBottom ?? 4} mm
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginBottom: Math.max(0, (prev.receiptMarginBottom ?? 4) - 1)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    -
+                  </button>
+                  <input
+                    id="receipt-margin-bottom"
+                    type="range"
+                    min="0"
+                    max="30"
+                    step="1"
+                    value={formData.receiptMarginBottom ?? 4}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginBottom: Number(e.target.value)
+                      }))
+                    }
+                    className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginBottom: Math.min(30, (prev.receiptMarginBottom ?? 4) + 1)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* LEFT MARGIN */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <label htmlFor="receipt-margin-left" className="font-semibold text-slate-200">
+                    Left Margin
+                  </label>
+                  <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded text-xs">
+                    {formData.receiptMarginLeft ?? 2} mm
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginLeft: Math.max(0, Math.round(((prev.receiptMarginLeft ?? 2) - 0.5) * 10) / 10)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    -
+                  </button>
+                  <input
+                    id="receipt-margin-left"
+                    type="range"
+                    min="0"
+                    max="15"
+                    step="0.5"
+                    value={formData.receiptMarginLeft ?? 2}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginLeft: Number(e.target.value)
+                      }))
+                    }
+                    className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginLeft: Math.min(15, Math.round(((prev.receiptMarginLeft ?? 2) + 0.5) * 10) / 10)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* RIGHT MARGIN */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <label htmlFor="receipt-margin-right" className="font-semibold text-slate-200">
+                    Right Margin
+                  </label>
+                  <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded text-xs">
+                    {formData.receiptMarginRight ?? 2} mm
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginRight: Math.max(0, Math.round(((prev.receiptMarginRight ?? 2) - 0.5) * 10) / 10)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    -
+                  </button>
+                  <input
+                    id="receipt-margin-right"
+                    type="range"
+                    min="0"
+                    max="15"
+                    step="0.5"
+                    value={formData.receiptMarginRight ?? 2}
+                    onChange={(e) =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginRight: Number(e.target.value)
+                      }))
+                    }
+                    className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSettingsImmediate((prev) => ({
+                        ...prev,
+                        receiptMarginRight: Math.min(15, Math.round(((prev.receiptMarginRight ?? 2) + 0.5) * 10) / 10)
+                      }))
+                    }
+                    className="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold flex items-center justify-center cursor-pointer transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. SHOP LOGO & WATERMARK POSITION */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <div className="flex items-center gap-2">
@@ -1204,6 +1631,164 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
               </div>
             </div>
           </div>
+
+          {/* 8. SECURITY, AUTO-LOCK, BACKUP & AC/NON-AC PRICING SETTINGS */}
+          <div className="bg-[#1E293B] border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-bold text-sm text-white">Security, Auto-Backup &amp; Pricing Defaults</h3>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                Enterprise Controls
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Inactivity Auto-Lock */}
+              <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-200">
+                  Inactivity Auto-Lock
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Automatically lock POS terminal when idle
+                </p>
+                <select
+                  value={inactivityTimeoutMins}
+                  onChange={(e) => {
+                    const nextVal = Number(e.target.value);
+                    setInactivityTimeoutMins(nextVal);
+                    try {
+                      localStorage.setItem('pos_inactivity_timeout_mins', String(nextVal));
+                    } catch (_) {}
+                  }}
+                  className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={5}>After 5 Minutes</option>
+                  <option value={10}>After 10 Minutes</option>
+                  <option value={15}>After 15 Minutes (Default)</option>
+                  <option value={30}>After 30 Minutes</option>
+                  <option value={60}>After 60 Minutes</option>
+                  <option value={0}>Never Auto-Lock</option>
+                </select>
+              </div>
+
+              {/* Default AC / Non-AC Pricing Tier */}
+              <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-200">
+                  Default Hall Pricing
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Default rate mode for new bills &amp; KOTs
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDefaultPricingTier('NON_AC');
+                      try {
+                        localStorage.setItem('pos_default_pricing_tier', 'NON_AC');
+                      } catch (_) {}
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      defaultPricingTier === 'NON_AC'
+                        ? 'bg-emerald-600 text-white border-emerald-500'
+                        : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    Non-AC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDefaultPricingTier('AC');
+                      try {
+                        localStorage.setItem('pos_default_pricing_tier', 'AC');
+                      } catch (_) {}
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      defaultPricingTier === 'AC'
+                        ? 'bg-emerald-600 text-white border-emerald-500'
+                        : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    AC Hall
+                  </button>
+                </div>
+              </div>
+
+              {/* Daily Backup Closing Time */}
+              <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <label className="block text-xs font-bold text-slate-200">
+                  Daily Auto-Backup Time
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  PDF &amp; Excel daily sales backup schedule
+                </p>
+                <input
+                  type="time"
+                  value={dailyBackupClosingTime}
+                  onChange={(e) => {
+                    setDailyBackupClosingTime(e.target.value);
+                    try {
+                      localStorage.setItem('pos_daily_backup_closing_time', e.target.value);
+                    } catch (_) {}
+                  }}
+                  className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {onNavigateTab && (
+              <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-slate-400">
+                  Manage staff accounts, roles, PINs, and menu item pricing:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('menu')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    Configure AC / Non-AC Menu Prices
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('users')}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    Open User Management
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 9. BILLING DATA & SYSTEM RESET */}
+          <div className="bg-slate-900 border border-red-950/60 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <h3 className="font-bold text-sm text-white">Billing Data &amp; Reset</h3>
+              </div>
+              <span className="text-[10px] font-bold text-red-400 bg-red-950/80 border border-red-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Danger Zone
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Erase all bills and bill items from both cloud Firestore and local storage. The bill numbering sequence will reset back to <strong className="text-white">#01</strong>. All menu items, prices, categories, and printer configurations will remain untouched.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowEraseBillsModal(true)}
+              className="px-4 py-2 bg-red-950/60 hover:bg-red-900/80 border border-red-500/40 text-red-300 hover:text-red-200 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>Erase All Bills from Software</span>
+            </button>
+          </div>
         </div>
 
         {/* Right Column: Persistent Live 3-Inch Receipt Preview + Print Diagnostic Status (5 cols) */}
@@ -1289,6 +1874,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           </div>
         </div>
       </div>
+
+      {/* Erase All Bills Confirmation Modal */}
+      {showEraseBillsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="p-2.5 bg-red-950/80 border border-red-500/30 rounded-xl shrink-0">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-white">Erase All Bills in Software?</h3>
+                <p className="text-[11px] text-red-400 font-semibold">Irreversible Action • Cloud &amp; Local Wipe</p>
+              </div>
+            </div>
+
+            <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3.5 text-xs text-red-200 space-y-2">
+              <p className="font-medium text-slate-200">
+                Are you sure you want to erase all bills from the system?
+              </p>
+              <ul className="list-disc pl-4 text-[11px] space-y-1 text-red-300">
+                <li>All historical bills, orders, and item lines will be erased.</li>
+                <li>The bill sequence counter will reset back to <strong>#01</strong>.</li>
+                <li>Menu items, rates, categories, and printer settings are completely preserved.</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={erasingBills}
+                onClick={() => setShowEraseBillsModal(false)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEraseAllBillsInSettings}
+                disabled={erasingBills}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Trash2 className={`w-3.5 h-3.5 ${erasingBills ? 'animate-spin' : ''}`} />
+                <span>{erasingBills ? 'Erasing All Bills...' : 'Yes, Erase All Bills'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

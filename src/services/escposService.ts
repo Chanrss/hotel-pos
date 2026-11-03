@@ -142,7 +142,7 @@ export class EscPosService {
     } else {
       parts.push(0x1d, 0x21, 0x00); // Normal compact
     }
-    const restaurantName = settings?.restaurantName || 'SRI SARAVANA BHAVAN';
+    const restaurantName = settings?.restaurantName || 'SRI SARAVANABHAVAN';
     pushAscii(restaurantName.toUpperCase() + '\n');
 
     // Return to normal font size
@@ -150,46 +150,40 @@ export class EscPosService {
     setBold(false);
 
     // Address lines
-    if (settings?.address) {
-      setAlign(addressAlign);
-      const addrLines = settings.address.split(/\n|,\s*(?=Anna Nagar)/);
-      addrLines.forEach((line) => {
-        if (line.trim()) pushAscii(line.trim() + '\n');
-      });
-    }
+    const rawAddress = settings?.address || 'No: 8A, Rajambal Nagar, Salem Main Road,\nAnna Nagar, Kallakurichi - 606202';
+    setAlign(addressAlign);
+    const addrLines = rawAddress.split(/\n|,\s*(?=Anna Nagar)/);
+    addrLines.forEach((line) => {
+      if (line.trim()) pushAscii(line.trim() + '\n');
+    });
 
     // Phone
-    if (settings?.phone) {
-      setAlign(phoneAlign);
-      pushAscii(`PH: ${settings.phone}\n`);
-    }
-    if (settings?.gstNumber) {
-      setAlign(addressAlign);
-      pushAscii(`GSTIN: ${settings.gstNumber}\n`);
-    }
+    const rawPhone = settings?.phone || '9976974098, 7810066035';
+    setAlign(phoneAlign);
+    pushAscii(rawPhone.toLowerCase().startsWith('ph') ? `${rawPhone}\n` : `Ph: ${rawPhone}\n`);
 
     // 7. BILL HEADER META
     parts.push(0x1b, 0x61, 0x00); // Left for divider
     pushAscii(separator);
 
-    const billNum = bill.billNumber ? bill.billNumber.replace(/^BN-|^#/, '') : '1';
+    const billNum = bill.billNumber ? String(bill.billNumber).replace(/^BN-|^#/, '') : '01';
     const createdDate = new Date(bill.createdAt || Date.now());
     const dd = String(createdDate.getDate()).padStart(2, '0');
     const mm = String(createdDate.getMonth() + 1).padStart(2, '0');
     const yyyy = createdDate.getFullYear();
-    const dateStr = `${dd}-${mm}-${yyyy}`;
+    const dateStr = `${dd}/${mm}/${yyyy}`;
     const timeStr = createdDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
+    const captainNum = (bill as any)?.captainNumber || (bill as any)?.captainCode || '01';
 
-    setAlign(billHeaderAlign);
-    setBold(boldBillNumber);
-    pushAscii(`Bill No: ${billNum}\n`);
-    setBold(false);
-    pushAscii(`Date: ${dateStr}\n`);
-    pushAscii(`Time: ${timeStr}${bill.tableNumber ? ` | Table: ${bill.tableNumber}` : ''}\n`);
+    setAlign('left');
+    // Row 1: Bill No & Date
+    pushAscii(alignLR(`Bill No : ${billNum}`, `Date : ${dateStr}`));
+    // Row 2: Captain No & Time
+    pushAscii(alignLR(`Captain No : ${captainNum}`, `Time : ${timeStr}`));
 
     if (bill.reprintCount && bill.reprintCount > 0) {
       setAlign('center');
@@ -201,70 +195,78 @@ export class EscPosService {
     parts.push(0x1b, 0x61, 0x00); // Left align for item table
     pushAscii(separator);
 
-    // 8. ITEM TABLE (3-Inch / 48-Column Compact Layout)
+    // 8. ITEM TABLE (ITEM | QTY | RATE | AMOUNT)
     setBold(boldItemHeader);
     if (is58mm) {
-      pushAscii('Item             Qty Price Total\n');
+      pushAscii('ITEM             QTY  RATE  AMOUNT\n');
     } else {
-      pushAscii('Item                     Qty   Price     Total\n');
+      pushAscii('ITEM                     QTY    RATE    AMOUNT\n');
     }
     setBold(false);
     pushAscii(separator);
 
-    items.forEach((item, idx) => {
+    items.forEach((item) => {
       const rawName = item.itemName || 'Item';
-      if (is58mm) {
-        const name = rawName.slice(0, 16).padEnd(16, ' ');
-        const qty = item.quantity.toString().padStart(3, ' ');
-        const rate = (item.unitPrice || 0).toFixed(0).padStart(5, ' ');
-        const amt = (item.totalPrice || 0).toFixed(0).padStart(6, ' ');
-        pushAscii(`${name} ${qty} ${rate} ${amt}\n`);
-      } else {
-        const namePart = rawName.length > 24 ? rawName.slice(0, 24) : rawName.padEnd(24, ' ');
-        const qtyPart = item.quantity.toString().padStart(4, ' ');
-        const ratePart = (item.unitPrice || 0).toFixed(0).padStart(8, ' ');
-        const amtPart = (item.totalPrice || 0).toFixed(0).padStart(10, ' ');
-        pushAscii(`${namePart}${qtyPart}${ratePart}${amtPart}\n`);
-      }
+      const qtyNum = Number(item.quantity) || 0;
+      const rateNum = Number(item.unitPrice) || 0;
+      const amtNum = qtyNum * rateNum;
 
-      // Centered Watermark indicator in middle of receipt when enabled
-      if (watermarkEnabled && idx === Math.floor((items.length - 1) / 2)) {
-        // Non-intrusive ESC/POS comment/watermark metadata
+      if (is58mm) {
+        const qty = qtyNum.toString().padStart(3, ' ');
+        const rate = (rateNum % 1 === 0 ? rateNum.toFixed(0) : rateNum.toFixed(2)).padStart(6, ' ');
+        const amt = amtNum.toFixed(2).padStart(8, ' ');
+        if (rawName.length <= 15) {
+          const name = rawName.padEnd(15, ' ');
+          pushAscii(`${name} ${qty} ${rate} ${amt}\n`);
+        } else {
+          const line1 = rawName.slice(0, 15);
+          const line2 = rawName.slice(15);
+          pushAscii(`${line1} ${qty} ${rate} ${amt}\n`);
+          pushAscii(`${line2}\n`);
+        }
+      } else {
+        const qtyPart = qtyNum.toString().padStart(4, ' ');
+        const ratePart = (rateNum % 1 === 0 ? rateNum.toFixed(0) : rateNum.toFixed(2)).padStart(8, ' ');
+        const amtPart = amtNum.toFixed(2).padStart(10, ' ');
+        if (rawName.length <= 24) {
+          const namePart = rawName.padEnd(24, ' ');
+          pushAscii(`${namePart}${qtyPart}${ratePart}${amtPart}\n`);
+        } else {
+          const line1 = rawName.slice(0, 24);
+          const line2 = rawName.slice(24);
+          pushAscii(`${line1}${qtyPart}${ratePart}${amtPart}\n`);
+          pushAscii(`${line2}\n`);
+        }
       }
     });
 
     pushAscii(separator);
 
-    // 9. GRAND TOTAL
-    if (bill.discount && bill.discount > 0) {
-      pushAscii(alignLR('Subtotal:', `${(bill.subtotal || 0).toFixed(0)}`));
-      pushAscii(alignLR('Discount:', `-${bill.discount.toFixed(0)}`));
-    }
+    // 9. BILL TOTAL (Subtotal & Grand Total only, no taxes)
+    const subtotalVal = bill.subtotal !== undefined
+      ? bill.subtotal
+      : items.reduce((s, itm) => s + ((Number(itm.quantity) || 0) * (Number(itm.unitPrice) || 0)), 0);
+    const grandTotalVal = bill.grandTotal !== undefined ? bill.grandTotal : subtotalVal;
+
+    pushAscii(alignLR('Subtotal:', subtotalVal.toFixed(2)));
+    pushAscii(separator);
 
     setBold(boldGrandTotal);
     parts.push(0x1d, 0x21, 0x01); // Double-Height
-    const totalStr = `Rs. ${(bill.grandTotal || 0).toFixed(0)}`;
-    pushAscii(alignLR('Grand Total:', totalStr));
+    pushAscii(alignLR('GRAND TOTAL:', grandTotalVal.toFixed(2)));
 
     // Reset font attributes
     parts.push(0x1d, 0x21, 0x00);
     setBold(false);
     pushAscii(separator);
 
-    // 10. CENTER WATERMARK STAMP (when enabled)
-    if (watermarkEnabled) {
-      setAlign('center');
-      pushAscii(`[ ${restaurantName.toUpperCase()} ]\n`);
-    }
-
-    // 11. FOOTER
+    // 10. FOOTER
     setAlign(footerAlign);
     setBold(boldFooter);
-    const footerText = settings?.receiptFooter || 'THANK YOU';
-    pushAscii(footerText + '\n');
+    pushAscii('THANK YOU VISIT AGAIN\n');
     setBold(false);
 
-    // 12. COMPACT FEED AND PARTIAL AUTO-CUT (No excessive blank lines)
+    // 11. COMPACT FEED AND PARTIAL AUTO-CUT
     parts.push(0x1b, 0x64, 0x03);       // ESC d 3: Feed 3 lines
     parts.push(0x1d, 0x56, 0x42, 0x00); // GS V 66 0: Partial cut
 
@@ -360,60 +362,107 @@ export class EscPosService {
   }
 
   /**
-   * Generates raw ESC/POS binary buffer for Kitchen Order Tickets (KOT).
+   * Generates raw ESC/POS binary buffer for Kitchen Order Tickets (KOT)
+   * optimized for an extremely compact 3-inch thermal printer layout:
+   * - KOT number at top
+   * - Only two fixed-width columns: QTY and ITEM
+   * - Small, clear, bold text with tight line spacing
+   * - Short separator lines, no logos/prices/totals/extra info, no blank lines
+   * - Automatic word wrapping for long item names without overlapping QTY column
+   * - Immediate cut after last item without unnecessary blank paper feed
    */
   static generateKotEscPosBuffer(kot: Kot, items: KotItem[]): Uint8Array {
     const parts: number[] = [];
-    const width = 48; // 80mm standard
+    const qtyColWidth = 5;  // Fixed 5-char column for QTY (e.g. "12   ")
+    const itemColWidth = 35; // 35-char column for ITEM on 3-inch thermal roll
+    const shortSeparator = '------------------------\n';
 
     const pushAscii = (text: string) => {
       for (let i = 0; i < text.length; i++) {
-        parts.push(text.charCodeAt(i) & 0xff);
+        const code = text.charCodeAt(i);
+        parts.push(code <= 0xff ? code : 0x3f);
       }
     };
 
-    const alignLR = (left: string, right: string): string => {
-      const available = width - left.length - right.length;
-      if (available <= 0) return left.slice(0, width - right.length - 1) + ' ' + right + '\n';
-      return left + ' '.repeat(available) + right + '\n';
+    const wrapItemName = (name: string, maxLen: number): string[] => {
+      const cleaned = (name || 'Item').trim().replace(/\s+/g, ' ');
+      if (cleaned.length <= maxLen) return [cleaned];
+      const words = cleaned.split(' ');
+      const lines: string[] = [];
+      let current = '';
+
+      for (const word of words) {
+        if (!current) {
+          if (word.length <= maxLen) {
+            current = word;
+          } else {
+            for (let i = 0; i < word.length; i += maxLen) {
+              const chunk = word.slice(i, i + maxLen);
+              if (chunk.length === maxLen && i + maxLen < word.length) {
+                lines.push(chunk);
+              } else {
+                current = chunk;
+              }
+            }
+          }
+        } else if (current.length + 1 + word.length <= maxLen) {
+          current += ' ' + word;
+        } else {
+          lines.push(current);
+          if (word.length <= maxLen) {
+            current = word;
+          } else {
+            current = '';
+            for (let i = 0; i < word.length; i += maxLen) {
+              const chunk = word.slice(i, i + maxLen);
+              if (chunk.length === maxLen && i + maxLen < word.length) {
+                lines.push(chunk);
+              } else {
+                current = chunk;
+              }
+            }
+          }
+        }
+      }
+      if (current) lines.push(current);
+      return lines.length > 0 ? lines : [cleaned.slice(0, maxLen)];
     };
 
-    parts.push(0x1b, 0x40); // Init
-    parts.push(0x1b, 0x74, 0x00); // PC437
-    parts.push(0x1b, 0x61, 0x01); // Center
+    const rawKotNo = String(kot.kotNumber || '1').trim();
+    const kotDisplay = rawKotNo.toUpperCase().startsWith('KOT') ? rawKotNo : `KOT-${rawKotNo}`;
 
-    // KOT Header
-    parts.push(0x1b, 0x45, 0x01); // Bold ON
-    parts.push(0x1d, 0x21, 0x11); // Double-Height + Double-Width
-    pushAscii('KITCHEN ORDER TICKET\n');
-    parts.push(0x1d, 0x21, 0x00); // Normal
-    parts.push(0x1b, 0x45, 0x00); // Bold OFF
+    // 1. Initialize printer & code page
+    parts.push(0x1b, 0x40);       // ESC @: Initialize
+    parts.push(0x1b, 0x74, 0x00); // ESC t 0: PC437
+    parts.push(0x1b, 0x33, 0x10); // ESC 3 16: Compact line spacing (minimal vertical gap)
+    parts.push(0x1b, 0x61, 0x00); // ESC a 0: Left align
+    parts.push(0x1d, 0x21, 0x00); // GS ! 0x00: Small, clear normal font size
+    parts.push(0x1b, 0x45, 0x01); // ESC E 1: Bold ON for all KOT text
 
-    parts.push(0x1b, 0x61, 0x00); // Left
-    pushAscii('='.repeat(width) + '\n');
-    pushAscii(alignLR(`KOT No: #${kot.kotNumber}`, `Table: ${kot.tableNumber || 'Take Away'}`));
-    pushAscii(alignLR(`Waiter: ${kot.waiterName || 'Staff'}`, `Time: ${new Date(kot.createdAt).toLocaleTimeString('en-IN')}`));
-    pushAscii('-'.repeat(width) + '\n');
+    // 2. KOT Number at top + short separator + 2-column header
+    pushAscii(`KOT: ${kotDisplay}\n`);
+    pushAscii(shortSeparator);
+    pushAscii(`${'QTY'.padEnd(qtyColWidth, ' ')}ITEM\n`);
+    pushAscii(shortSeparator);
 
-    // Items list in large bold font for kitchen visibility
-    parts.push(0x1b, 0x45, 0x01); // Bold
-    parts.push(0x1d, 0x21, 0x01); // Double-height
+    // 3. Two-column items list with non-overlapping wrapped item names
+    const indentSpaces = ' '.repeat(qtyColWidth);
     items.forEach((item) => {
-      const name = item.itemName.slice(0, 30).padEnd(30, ' ');
-      const qty = `QTY: ${item.quantity}`.padStart(12, ' ');
-      pushAscii(`${name} ${qty}\n`);
-      if (item.notes) {
-        pushAscii(`   >> NOTE: ${item.notes}\n`);
+      const qtyStr = String(item.quantity ?? 1).slice(0, qtyColWidth - 1).padEnd(qtyColWidth, ' ');
+      const wrappedLines = wrapItemName(item.itemName || 'Item', itemColWidth);
+      pushAscii(`${qtyStr}${wrappedLines[0]}\n`);
+      for (let i = 1; i < wrappedLines.length; i++) {
+        pushAscii(`${indentSpaces}${wrappedLines[i]}\n`);
       }
     });
 
-    parts.push(0x1d, 0x21, 0x00); // Normal
+    pushAscii(shortSeparator);
     parts.push(0x1b, 0x45, 0x00); // Bold OFF
-    pushAscii('='.repeat(width) + '\n');
+    parts.push(0x1b, 0x32);       // ESC 2: Restore default line spacing
 
-    // Feed and cut
-    parts.push(0x1b, 0x64, 0x04);
-    parts.push(0x1d, 0x56, 0x42, 0x00);
+    // 4. Print immediately with minimal feed (1 line) and partial cut (no blank paper waste)
+    parts.push(0x1b, 0x64, 0x01);       // ESC d 1: Minimal 1-line advance
+    parts.push(0x1d, 0x56, 0x42, 0x00); // GS V 66 0: Partial cut
 
     return new Uint8Array(parts);
   }

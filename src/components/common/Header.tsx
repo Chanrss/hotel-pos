@@ -20,8 +20,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Radio
+  Radio,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { RestaurantSettings } from '../../types';
@@ -29,6 +29,7 @@ import { DEFAULT_RESTAURANT_LOGO, SRI_SARAVANA_BHAVAN_SVG } from '../../data/def
 import { getBusinessDate, formatBillNumber } from '../../services/billNumberEngine';
 import { getLocalBills } from '../../services/localBillStore';
 import { RemotePrintQueueService } from '../../services/remotePrintQueueService';
+import { getSavedPosTheme, applyPosTheme } from '../../services/posThemeService';
 import { NavTab } from './Sidebar';
 
 export interface HeaderProps {
@@ -48,11 +49,15 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar, 
   onNavigateSettings 
 }) => {
-  const { currentUser, isOnline: authOnline, logout, firebaseUser, hasPermission, isOwner, isManager, isWaiter } = useAuth();
+  const { currentUser, logout, hasPermission, isOwner, isManager } = useAuth();
   const [time, setTime] = useState(new Date());
   const [currentBillNo, setCurrentBillNo] = useState<string>('01');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isPrintServer, setIsPrintServer] = useState(() => RemotePrintQueueService.isPrimaryPrintServer());
+
+  useEffect(() => {
+    applyPosTheme(getSavedPosTheme());
+  }, []);
 
   // Track Remote Print Server role
   useEffect(() => {
@@ -186,7 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // RBAC-filtered Navigation Options (Full access controlled by Admin account)
+  // RBAC-filtered Navigation Options
   const navItems = [
     {
       id: 'dashboard' as NavTab,
@@ -195,20 +200,20 @@ export const Header: React.FC<HeaderProps> = ({
       show: isOwner || hasPermission('dashboard.view')
     },
     {
-      id: 'pos' as NavTab,
-      label: 'POS Billing',
-      icon: ShoppingBag,
-      show: isOwner || hasPermission('pos.view') || hasPermission('billing.create')
-    },
-    {
       id: 'direct-billing' as NavTab,
       label: 'Direct Billing',
       icon: Zap,
       show: isOwner || hasPermission('direct-billing.view') || hasPermission('billing.create')
     },
     {
+      id: 'pos' as NavTab,
+      label: 'Touch POS',
+      icon: ShoppingBag,
+      show: isOwner || hasPermission('pos.view') || hasPermission('billing.create')
+    },
+    {
       id: 'kot' as NavTab,
-      label: 'KOT',
+      label: 'New KOT',
       icon: ChefHat,
       show: isOwner || hasPermission('kot.view') || hasPermission('kot.create')
     },
@@ -220,13 +225,13 @@ export const Header: React.FC<HeaderProps> = ({
     },
     {
       id: 'reprint' as NavTab,
-      label: 'Orders',
+      label: 'Bills & Reprint',
       icon: Receipt,
       show: isOwner || hasPermission('billing.reprint') || hasPermission('billing.print')
     },
     {
       id: 'menu' as NavTab,
-      label: 'Menu',
+      label: 'Menu Catalog',
       icon: Utensils,
       show: isOwner || hasPermission('menu.view')
     },
@@ -238,13 +243,13 @@ export const Header: React.FC<HeaderProps> = ({
     },
     {
       id: 'reports' as NavTab,
-      label: 'Reports',
+      label: 'Reports & Backup',
       icon: BarChart3,
       show: isOwner || hasPermission('reports.view')
     },
     {
       id: 'users' as NavTab,
-      label: 'Admin',
+      label: 'Staff & Roles',
       icon: Users,
       show: isOwner
     },
@@ -252,32 +257,32 @@ export const Header: React.FC<HeaderProps> = ({
       id: 'settings' as NavTab,
       label: 'Settings',
       icon: Settings,
-      show: isOwner || hasPermission('settings.manage')
+      show: isOwner
     }
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full flex flex-col shrink-0 select-none bg-slate-950 text-slate-100 border-b border-slate-800">
-      {/* Compact Top Terminal Status Bar (h-10 / 40px) */}
-      <div className="h-10 px-2.5 sm:px-3 flex items-center justify-between gap-2 w-full bg-slate-950 border-b border-slate-800/90">
+    <header className="sticky top-0 z-40 w-full flex flex-col shrink-0 select-none bg-[#0F172A] text-white border-b border-slate-800 shadow-xs">
+      {/* Row 1: Enterprise Navy Status & Operator Bar */}
+      <div className="h-11 px-3 flex items-center justify-between gap-2 w-full bg-[#0F172A] border-b border-slate-800/80">
         
-        {/* Left: Hamburger Toggle + Compact Logo + Restaurant Name */}
-        <div className="flex items-center gap-2 min-w-0 shrink-0">
+        {/* Left: Sidebar Toggle + Preserved Restaurant Logo + Brand Name */}
+        <div className="flex items-center gap-2.5 min-w-0 shrink-0">
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="h-7 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-amber-400 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              title="Open Navigation Drawer [☰]"
+              className="h-8 px-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-100 hover:text-emerald-400 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title="Open Navigation Sidebar [☰]"
             >
-              <MenuIcon className="w-4 h-4 text-amber-400" />
+              <MenuIcon className="w-4 h-4 text-emerald-400" />
               <span className="text-2xs font-bold uppercase tracking-wider hidden sm:inline">Menu</span>
             </button>
           )}
 
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             {(settings?.logoUrl || DEFAULT_RESTAURANT_LOGO) ? (
-              <div className="w-6 h-6 rounded bg-white border border-amber-500/80 flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
+              <div className="w-7 h-7 rounded-lg bg-white border border-emerald-500/80 flex items-center justify-center p-0.5 shrink-0 overflow-hidden shadow-2xs">
                 <img
                   src={settings?.logoUrl || DEFAULT_RESTAURANT_LOGO}
                   alt={settings?.restaurantName || 'POS'}
@@ -290,34 +295,36 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </div>
             ) : (
-              <div className="w-6 h-6 rounded bg-amber-500 flex items-center justify-center text-slate-950 shrink-0">
-                <UtensilsCrossed className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0">
+                <UtensilsCrossed className="w-4 h-4" />
               </div>
             )}
 
-            <span className="font-extrabold text-xs sm:text-sm tracking-tight text-white uppercase truncate max-w-[140px] sm:max-w-[240px] md:max-w-none">
-              {settings?.restaurantName || 'SRI SARAVANA BHAVAN'}
-            </span>
+            <div className="min-w-0">
+              <span className="font-extrabold text-xs sm:text-sm tracking-tight text-white uppercase truncate block max-w-[150px] sm:max-w-[260px] md:max-w-none">
+                {settings?.restaurantName || 'SRI SARAVANA BHAVAN'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Center/Right: Terminal Telemetry Badges (Bill #, Date/Time, Fullscreen, Login/Logout) */}
-        <div className="flex items-center justify-end gap-1.5 shrink-0">
+        {/* Right: Active Bill Counter, Clock, Print Server Mode, Operator Role & Lock/Logout */}
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
           
           {/* Current Bill Sequence */}
           <div
             id="header-current-bill-no"
-            className="h-6 px-2 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center gap-1 font-mono text-xs font-bold shrink-0"
+            className="h-7 px-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center gap-1.5 font-mono text-xs font-bold shrink-0"
             title={`Active Bill Counter: #${currentBillNo}`}
           >
-            <Receipt className="w-3 h-3 text-amber-400 shrink-0" />
-            <span className="hidden xs:inline text-2xs text-amber-400/90">BILL</span>
-            <span className="font-black text-amber-200">#{currentBillNo}</span>
+            <Receipt className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="hidden xs:inline text-2xs text-emerald-300/90 uppercase">Bill</span>
+            <span className="font-extrabold text-white">#{currentBillNo}</span>
           </div>
 
           {/* Date & Time */}
-          <div className="hidden lg:flex items-center gap-1 h-6 px-2 rounded bg-slate-900 border border-slate-800 text-slate-300 font-mono text-2xs shrink-0">
-            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+          <div className="hidden lg:flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-mono text-2xs shrink-0">
+            <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{dateString}</span>
             <span className="text-slate-600">•</span>
             <span className="text-white font-semibold">{timeString}</span>
@@ -327,7 +334,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="h-6 w-6 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center cursor-pointer shrink-0"
+            className="h-7 w-7 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/15 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
             title={isFullscreen ? 'Exit Full Screen' : 'Full Screen POS'}
             aria-label={isFullscreen ? 'Exit Full Screen' : 'Full Screen POS'}
           >
@@ -342,70 +349,83 @@ export const Header: React.FC<HeaderProps> = ({
               setIsPrintServer(next);
               RemotePrintQueueService.setPrimaryPrintServer(next);
             }}
-            className={`h-6 px-2 rounded font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 border transition-all ${
+            className={`h-7 px-2.5 rounded-lg font-bold text-2xs flex items-center gap-1.5 cursor-pointer shrink-0 border transition-all ${
               isPrintServer
-                ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/60 text-emerald-300'
+                ? 'bg-emerald-950/90 hover:bg-emerald-900 border-emerald-500/60 text-emerald-300'
                 : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400'
             }`}
             title={
               isPrintServer
-                ? 'Primary Print Server: ACTIVE (Listening for waiter KOT print jobs). Click to toggle to Waiter mode.'
-                : 'Waiter Client Mode (KOTs sent to Counter POS via Firestore). Click to become Print Server.'
+                ? 'KOT Queue Server: ACTIVE (Listening for waiter orders via cloud). Click to toggle.'
+                : 'Waiter Client Mode (Orders routed to Counter). Click to switch to Print Server.'
             }
           >
-            <Radio className={`w-3 h-3 ${isPrintServer ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+            <Radio className={`w-3.5 h-3.5 ${isPrintServer ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
             <span className="hidden sm:inline">{isPrintServer ? 'Print Server ON' : 'Waiter Mode'}</span>
             <span className="sm:hidden">{isPrintServer ? 'Server' : 'Waiter'}</span>
           </button>
 
-          {/* Standalone Tab Button (Unlocks Native Hardware / WebSerial / System Spooler when in iframe) */}
-          {typeof window !== 'undefined' && window.self !== window.top && (
-            <button
-              type="button"
-              onClick={() => window.open(window.location.href, '_blank', 'noopener,noreferrer')}
-              className="h-6 px-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs transition-colors"
-              title="Open in standalone browser window to unlock direct Web Serial / USB thermal printers and native print dialogs"
+          {/* Active Operator Role Badge */}
+          {currentUser && (
+            <div
+              data-testid="header-active-user-badge"
+              className="hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-slate-900 border border-slate-700 text-2xs font-bold shrink-0"
+              title={`Logged in as ${currentUser.name} (@${currentUser.username})`}
             >
-              <ExternalLink className="w-3 h-3" />
-              <span className="hidden sm:inline">Open in Tab (Unlocks Printer)</span>
-              <span className="sm:hidden">New Tab</span>
-            </button>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                  isOwner
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : isManager
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                    : 'bg-slate-700 text-slate-200 border border-slate-600'
+                }`}
+              >
+                {isOwner ? 'OWNER' : isManager ? 'MANAGER' : 'STAFF'}
+              </span>
+              <span className="text-slate-100 truncate max-w-[90px]">{currentUser.name}</span>
+            </div>
           )}
 
-          {/* Auth Action */}
+          {/* Switch User Action */}
           <button
             type="button"
             onClick={onOpenAuth}
-            className="h-6 px-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0"
-            title="Staff Login (Username & PIN)"
+            className="h-7 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+            title="Switch Staff Operator (Username & PIN)"
           >
-            <LogIn className="w-3 h-3" />
-            <span className="hidden xs:inline">Login</span>
+            <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline">Switch</span>
           </button>
 
+          {/* Lock / Logout Action */}
           {currentUser && (
             <button
               type="button"
               onClick={logout}
-              className="h-6 px-1.5 rounded bg-slate-900 hover:bg-red-950 text-slate-400 hover:text-red-300 border border-slate-800 flex items-center justify-center cursor-pointer shrink-0"
-              title="Sign Out"
+              data-testid="header-logout-btn"
+              className="h-7 px-2.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-100 hover:text-white border border-red-800/80 flex items-center gap-1 font-bold text-2xs justify-center cursor-pointer shrink-0 transition-colors"
+              title="Lock Terminal & Sign Out"
+              aria-label="Sign Out"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <Lock className="w-3.5 h-3.5 hidden sm:inline" />
+              <LogOut className="w-3.5 h-3.5 sm:hidden" />
+              <span className="hidden md:inline">Logout</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Compact Row 2: Main Navigation Bar (h-8 / 32px) */}
-      <div className="relative w-full h-8 bg-slate-900 flex items-center select-none shrink-0">
+      {/* Row 2: Quick Horizontal Module Bar */}
+      <div className="relative w-full h-9 bg-[#1E293B] flex items-center select-none shrink-0 border-t border-slate-800/60">
         {canScrollLeft && (
           <button
             type="button"
             onClick={() => scrollNav('left')}
-            className="absolute left-0 top-0 bottom-0 z-10 px-1.5 bg-slate-950/90 text-amber-400 hover:text-amber-300 flex items-center justify-center cursor-pointer"
+            className="absolute left-0 top-0 bottom-0 z-10 px-2 bg-[#0F172A]/95 text-emerald-400 hover:text-emerald-300 flex items-center justify-center cursor-pointer"
             title="Scroll left"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
         )}
 
@@ -413,7 +433,7 @@ export const Header: React.FC<HeaderProps> = ({
           ref={navScrollRef}
           onScroll={checkNavScroll}
           aria-label="Main POS Navigation"
-          className="w-full flex items-center gap-1 px-2 overflow-x-auto no-scrollbar scroll-smooth"
+          className="w-full flex items-center gap-1 px-2.5 overflow-x-auto no-scrollbar scroll-smooth"
         >
           {navItems.map((item) => {
             if (!item.show) return null;
@@ -425,13 +445,13 @@ export const Header: React.FC<HeaderProps> = ({
                 data-tab-id={item.id}
                 type="button"
                 onClick={() => onSelectTab && onSelectTab(item.id)}
-                className={`h-6 px-2.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-amber-500 text-slate-950 font-black'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    ? 'bg-emerald-600 text-white font-extrabold shadow-xs'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-slate-950' : 'text-amber-400'}`} />
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -442,10 +462,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => scrollNav('right')}
-            className="absolute right-0 top-0 bottom-0 z-10 px-1.5 bg-slate-950/90 text-amber-400 hover:text-amber-300 flex items-center justify-center cursor-pointer"
+            className="absolute right-0 top-0 bottom-0 z-10 px-2 bg-[#0F172A]/95 text-emerald-400 hover:text-emerald-300 flex items-center justify-center cursor-pointer"
             title="Scroll right"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         )}
       </div>

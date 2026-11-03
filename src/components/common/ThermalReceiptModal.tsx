@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Printer, X, Check, Copy, AlertCircle, ExternalLink, HelpCircle } from 'lucide-react';
+import { Printer, X, Check, Copy, AlertCircle, ExternalLink, HelpCircle, Download } from 'lucide-react';
 import { Bill, BillItem, RestaurantSettings } from '../../types';
 import { PrinterService } from '../../services/printerService';
 import { PrintService } from '../../services/PrintService';
@@ -14,6 +14,7 @@ import { ConnectedPrinterInfo } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { PrintLogoScaleControlPanel } from './PrintLogoScaleControlPanel';
+import { ReceiptTemplate } from './ReceiptTemplate';
 
 interface ThermalReceiptModalProps {
   bill: Bill | null;
@@ -242,14 +243,14 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
       `Date : ${dateFormatted}              Time : ${timeFormatted}`,
       `Cap No : ${captainNumber}                    Table No : ${tableNo}`,
       '',
-      'SL பொருள்                       Qty    Rate     Tot',
+      'SL Item                    Qty   Rate    Tot',
       ...items.map((item, idx) => {
         const tamilName = getTamilItemName(item.itemName, item.itemNameTamil);
         const displayName = tamilName || item.itemName;
-        const name = `${idx + 1}.${displayName}`.padEnd(28).slice(0, 28);
-        const qty = Number(item.quantity).toFixed(2).padStart(7);
-        const rate = Number(item.unitPrice).toFixed(2).padStart(8);
-        const tot = Number(item.totalPrice).toFixed(2).padStart(8);
+        const name = `${idx + 1}.${displayName}`.padEnd(24).slice(0, 24);
+        const qty = Number(item.quantity).toFixed(2).padStart(6);
+        const rate = Number(item.unitPrice).toFixed(2).padStart(7);
+        const tot = Number(item.totalPrice).toFixed(2).padStart(7);
         return `${name} ${qty} ${rate} ${tot}`;
       }),
       '',
@@ -265,6 +266,17 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
+  };
+
+  const handleDownloadPrintFile = () => {
+    const effectiveSettings: RestaurantSettings = {
+      ...(settings || {}),
+      receiptLogoMaxWidth: logoMaxWidth,
+      receiptLogoMaxHeight: logoMaxHeight,
+      logoDisplay: activeLogoDisplay
+    };
+    const htmlReceipt = PrinterService.generateThermalReceiptHTML(bill, items, effectiveSettings);
+    PrinterService.downloadPrintableReceiptFile(htmlReceipt, `receipt-BN-${cleanBillNo}.html`);
   };
 
   const isCompact = Boolean(settings?.compactMode);
@@ -411,153 +423,28 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
           <div className="flex justify-center pb-2">
             <div 
               id="thermal-receipt-preview" 
+              className="shadow-md border border-slate-300 bg-white"
               style={{
-                fontSize: `${baseFontSize}px`,
-                ['--receipt-base-font-size' as any]: `${baseFontSize}px`,
-                ['--receipt-logo-max-width' as any]: `${logoMaxWidth}px`,
-                ['--receipt-logo-max-height' as any]: `${logoMaxHeight}px`,
-                lineHeight: isCompact ? '1.12' : '1.25'
+                width: is58mm ? '58mm' : '76mm',
+                maxWidth: is58mm ? '58mm' : '76mm',
+                boxSizing: 'border-box',
+                overflowX: 'hidden'
               }}
-              className={`relative ${is58mm ? 'w-[230px]' : 'w-[290px]'} bg-white ${isCompact ? 'p-2' : 'p-3.5'} shadow-md border border-slate-300 font-mono text-black select-text overflow-hidden transition-all ${isCompact ? 'compact-mode receipt-compact' : ''}`}
             >
-              {/* Center Background Watermark Logo with Light Shadow Effect */}
-              {(activeLogoDisplay === 'watermark' || activeLogoDisplay === 'both') && !logoLoadError && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 overflow-hidden">
-                  <div 
-                    className="relative flex items-center justify-center transition-opacity duration-300"
-                    style={{ 
-                      opacity: watermarkOpacity,
-                      width: `${is58mm ? 120 : 150}px`,
-                      height: `${is58mm ? 120 : 150}px`
-                    }}
-                  >
-                    <img 
-                      src={originalLogoUrl} 
-                      alt="Background Watermark Logo" 
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        width: 'auto',
-                        height: 'auto',
-                        objectFit: 'contain'
-                      }}
-                      className="drop-shadow-[0_0_8px_rgba(0,0,0,0.15)]"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Receipt Content Container (Watermark Alone - No Top Header Logo) */}
-              <div className="relative z-10">
-
-              {/* 1. Header: Hotel Name in Tamil ONLY, Compact Address lines, Phone Number */}
-              <div className={`mb-1 ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
-                <div className="font-extrabold text-[20px] sm:text-[22px] tracking-wide text-black leading-tight font-sans mb-0.5">
-                  {hotelNameTamil}
-                </div>
-                <div className="restaurant-address address-section text-[12px] sm:text-[12.5px] text-black leading-[0.96] mb-0">
-                  {addressLines.map((line, idx) => (
-                    <div key={idx} className="leading-[0.96] m-0 p-0">{line}</div>
-                  ))}
-                </div>
-                <div className="phone-section text-[12px] sm:text-[12.5px] text-black leading-[1.02] mt-0.5 mb-0">
-                  PH: {phone}
-                </div>
-                {(settings?.gstNumber || settings?.fssaiNumber) && (
-                  <div className="font-semibold text-slate-800 text-[10px] sm:text-[10.5px] leading-[1.02] mt-0.5">
-                    {settings?.gstNumber ? `GSTIN: ${settings.gstNumber}` : ''}
-                    {(settings?.gstNumber && settings?.fssaiNumber) ? ' | ' : ''}
-                    {settings?.fssaiNumber ? `FSSAI: ${settings.fssaiNumber}` : ''}
-                  </div>
-                )}
-              </div>
-
-              {(isReprint || bill.reprintCount > 0) && (
-                <div className="text-center border border-black py-0.5 my-1 text-[10.5px] font-black uppercase tracking-wider bg-slate-50">
-                  *** DUPLICATE / REPRINT ({bill.reprintCount ? (isReprint ? bill.reprintCount + 1 : bill.reprintCount) : 1}) ***
-                </div>
-              )}
-
-              {/* 2. Bill Meta: Bill No + Time in single line and Order Type + Captain Code in single line */}
-              <div className="my-1.5 py-1 border-t border-b border-dashed border-black text-[12.5px] sm:text-[13.5px] space-y-0.5">
-                <div className="flex justify-between items-center font-bold text-black">
-                  <span>Bill No : BN-{cleanBillNo}</span>
-                  <span className="sr-only">Bill No: #{bill.billNumber}</span>
-                  <span>Time : {timeFormatted}</span>
-                </div>
-                <div className="flex justify-between items-center text-black font-semibold">
-                  <span>Order : {bill.orderType === 'TAKE_AWAY' ? 'Takeaway' : `Dine-In${tableNo ? ` (${tableNo})` : ''}`}</span>
-                  <span>Captain : {captainNumber || '01'}</span>
-                </div>
-              </div>
-
-              {/* 3. Items Table: Item Number (#), Item Name in Tamil (BOLD, INCREASED SIZE), Qty (BOLD, INCREASED SIZE), Price (BOLD, INCREASED), Total (BOLD, INCREASED) */}
-              <table className="w-full my-1 border-collapse table-fixed" style={{ tableLayout: 'fixed' }}>
-                <thead>
-                  <tr className="text-left text-black border-y border-black font-black text-[15px] sm:text-[16px]">
-                    <th className="py-1 font-extrabold w-[8%] text-left whitespace-nowrap">#</th>
-                    <th className="py-1 pr-1 font-black w-[42%] text-left break-words">பொருள்</th>
-                    <th className="py-1 text-right font-black w-[16%] whitespace-nowrap">Qty</th>
-                    <th className="py-1 text-right font-black w-[17%] whitespace-nowrap">Price</th>
-                    <th className="py-1 text-right font-black w-[17%] whitespace-nowrap">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-dotted divide-slate-300">
-                  {items.map((item, idx) => {
-                    const tamilName = getTamilItemName(item.itemName, item.itemNameTamil);
-                    const displayName = tamilName || item.itemName;
-                    return (
-                      <tr key={idx} className="align-top">
-                        <td className="py-1 font-mono text-black text-left text-[14px] sm:text-[15px] whitespace-nowrap align-top">{idx + 1}</td>
-                        <td className="py-1 pr-1 text-black leading-snug break-words align-top">
-                          <div className="font-black text-black font-sans text-[18px] sm:text-[19px] text-left break-words leading-tight">{displayName}</div>
-                        </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[18px] sm:text-[19px] whitespace-nowrap align-top">
-                          <b>{Number(item.quantity).toFixed(0)}</b>
-                        </td>
-                        <td className="py-1 text-right font-mono text-black font-extrabold text-[16.5px] sm:text-[17.5px] whitespace-nowrap align-top">
-                          {Number(item.unitPrice).toFixed(2)}
-                        </td>
-                        <td className="py-1 text-right font-mono font-black text-black text-[17.5px] sm:text-[18.5px] whitespace-nowrap align-top">
-                          {Number(item.totalPrice).toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              {/* 4. Total Qty next to Item Total */}
-              <div className="space-y-0.5 text-[15px] sm:text-[16px] my-1 pt-1 border-t border-slate-300">
-                <div className="flex justify-between items-center text-black font-bold whitespace-nowrap">
-                  <span className="whitespace-nowrap">Total Qty : <span className="font-mono font-black text-[18px] sm:text-[19px] whitespace-nowrap">{totalQty.toFixed(0)}</span></span>
-                  <span className="whitespace-nowrap">Item Total : <span className="font-mono font-black text-[17.5px] sm:text-[18.5px] whitespace-nowrap">₹{Number(bill.subtotal).toFixed(2)}</span></span>
-                </div>
-                {bill.discount > 0 && (
-                  <div className="flex justify-between items-center text-red-700 font-semibold text-[14px]">
-                    <span>Discount :</span>
-                    <span className="font-mono font-bold">-₹{Number(bill.discount).toFixed(2)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 5. Grand Total (BOLD & PROMINENT) and Footer Line */}
-              <div className={`my-2 pt-2 border-t-2 border-black ${alignment === 'left' ? 'text-left' : alignment === 'right' ? 'text-right' : 'text-center'}`}>
-                <div className="font-black text-[25px] sm:text-[27px] text-black tracking-wide py-0.5">
-                  GRAND TOTAL: ₹{Number(bill.grandTotal).toFixed(2)}
-                  <span className="sr-only">₹{bill.grandTotal}</span>
-                </div>
-                <div className="text-[13px] sm:text-[13.5px] font-bold text-black mt-1 tracking-wider">
-                  {receiptFooter}
-                  <span className="sr-only">Thank you</span>
-                </div>
-                <div className="border-b border-dashed border-black mt-1.5" />
-              </div>
+              <ReceiptTemplate
+                bill={bill}
+                items={items}
+                settings={{
+                  ...settings,
+                  receiptLogoMaxWidth: logoMaxWidth,
+                  receiptLogoMaxHeight: logoMaxHeight,
+                  logoDisplay: activeLogoDisplay
+                }}
+                isReprint={isReprint}
+              />
             </div>
           </div>
         </div>
-      </div>
 
         {/* Modal Actions */}
         <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
@@ -593,6 +480,16 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
               <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPrintFile}
+              className="px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Download standalone receipt file to trigger your computer's thermal printer directly"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden xs:inline">Download (.html)</span>
+              <span className="xs:hidden">HTML</span>
             </button>
             <button
               type="button"

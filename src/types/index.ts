@@ -6,10 +6,13 @@ export interface AppUser {
   email: string;
   username?: string;
   pin?: string;
+  pinHash?: string;
   roleId: string;
   active: boolean;
   fullAccess?: boolean;
   permissions?: string[];
+  failedLoginAttempts?: number;
+  lockedUntil?: number;
   createdAt: number;
   updatedAt: number;
   lastLoginAt?: number;
@@ -144,6 +147,10 @@ export interface Bill {
   cancelReason?: string;
   deviceId?: string;
   transactionId?: string;
+  originalBillId?: string;
+  replacementBillId?: string;
+  replacesBillNumber?: string;
+  isRebill?: boolean;
   items?: BillItem[];
   createdAt: number;
   updatedAt?: number;
@@ -308,13 +315,21 @@ export interface RestaurantSettings {
   receiptSectionSpacing?: 'compact' | 'normal' | 'spacious'; // Margin spacing between sections (2px, 5px, 8px)
   receiptItemPadding?: 'compact' | 'normal' | 'spacious'; // Padding between individual item rows (1px, 2.5px, 4px)
   receiptPaperMargin?: 'minimal' | 'normal' | 'spacious'; // Horizontal margin on the thermal paper (2px, 6px, 10px)
+  receiptMarginTop?: number; // Custom top margin in mm (default: 2)
+  receiptMarginBottom?: number; // Custom bottom margin in mm (default: 4)
+  receiptMarginLeft?: number; // Custom left margin in mm (default: 2)
+  receiptMarginRight?: number; // Custom right margin in mm (default: 2)
   receiptShowItemSl?: boolean; // Toggle item serial numbers (# / SL)
   receiptShowTotalQty?: boolean; // Toggle net quantity summary row
   receiptShowGstFssai?: boolean; // Toggle GSTIN / FSSAI in receipt header
   receiptShowAddress?: boolean; // Toggle address lines in receipt header
   receiptShowPhone?: boolean; // Toggle phone number in receipt header
+  receiptShowEmail?: boolean; // Toggle email address in receipt header
   receiptShowTamilName?: boolean; // Toggle Tamil restaurant name
   receiptShowEnglishName?: boolean; // Toggle English restaurant name
+  receiptShowBranchName?: boolean; // Toggle branch name on receipt
+  receiptShowInvoiceTitle?: boolean; // Toggle invoice title banner
+  receiptShowHeader?: boolean; // Toggle store header subtitle
   receiptFeedLines?: number; // Feed lines before auto-cutter (1 to 4 lines)
   logoDisplay?: 'watermark' | 'header' | 'both' | 'none'; // How the uploaded logo is displayed
   logoRemoved?: boolean; // True when owner explicitly removes the shop logo
@@ -336,6 +351,45 @@ export interface RestaurantSettings {
   boldGrandTotal?: boolean;
   boldFooter?: boolean;
   compactMode?: boolean; // Paper-saving compact mode (reduced font sizes and tighter line spacing)
+  // Comprehensive Receipt Designer fields
+  invoiceTitle?: string; // e.g. "TAX INVOICE", "CASH RECEIPT", "ESTIMATE", "BILL OF SUPPLY"
+  invoiceNumberPrefix?: string; // e.g. "BN-", "INV-", ""
+  invoiceDateFormat?: 'DD-MM-YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD' | 'MMM DD, YYYY';
+  showInvoiceDate?: boolean;
+  showInvoiceTime?: boolean;
+  showOrderType?: boolean;
+  showTableNumber?: boolean;
+  showCaptainCode?: boolean;
+  showCustomerInfo?: boolean;
+  thankYouMessage?: string;
+  returnPolicy?: string;
+  receiptShowReturnPolicy?: boolean; // Toggle return policy / terms note on receipt
+  receiptFontFamily?: 'monospace' | 'sans-serif' | 'clean-pos' | 'tamil-noto';
+  receiptSeparatorStyle?: 'dashed' | 'dotted' | 'solid' | 'double';
+  customPaperWidthMm?: number;
+  receiptShowItemCode?: boolean; // SKU / Code column
+  receiptShowRate?: boolean; // Unit rate column
+  receiptShowItemDiscount?: boolean;
+  receiptShowItemTax?: boolean;
+  receiptShowLineTotal?: boolean;
+  receiptShowSubtotal?: boolean;
+  receiptShowDiscount?: boolean;
+  receiptShowCgst?: boolean;
+  receiptShowSgst?: boolean;
+  receiptShowIgst?: boolean;
+  receiptShowRoundOff?: boolean;
+  receiptShowGrandTotal?: boolean;
+  receiptShowPaymentMethod?: boolean;
+  receiptShowAmountPaid?: boolean;
+  receiptShowBalanceDue?: boolean;
+  receiptShowChangeReturned?: boolean;
+  receiptShowQrCode?: boolean;
+  receiptShowBarcode?: boolean;
+  receiptShowUpiDetails?: boolean;
+  receiptPayeeName?: string;
+  receiptPrintCopies?: number; // 1, 2, or 3
+  storeId?: string; // Store / Branch identifier for multi-store support
+  storeBranchName?: string;
   businessDayStartHour?: string;
   businessDayStart?: string;
   billNumberDigits?: number;
@@ -614,5 +668,80 @@ export interface RemotePrintJob {
   htmlSnapshot?: string;
 }
 
+export type BackupProcessStatus = 'Pending' | 'Processing' | 'Completed' | 'Failed';
 
+export interface DailySalesBackupStatusRecord {
+  id: string; // businessDate (YYYY-MM-DD)
+  businessDate: string; // YYYY-MM-DD
+  formattedDate: string; // DD-MM-YYYY
+  status: BackupProcessStatus;
+  pdfBackupStatus: BackupProcessStatus;
+  excelBackupStatus: BackupProcessStatus;
+  pdfFileName: string; // SSB_DD-MM-YYYY.pdf
+  excelFileName: string; // SSB_DD-MM-YYYY.xlsx
+  pdfStoragePath: string; // Daily_Sales_Backup/YYYY/MM-MonthName/SSB_DD-MM-YYYY.pdf
+  excelStoragePath: string; // Daily_Sales_Backup/YYYY/MM-MonthName/SSB_DD-MM-YYYY.xlsx
+  pdfDownloadUrl?: string;
+  excelDownloadUrl?: string;
+  pdfBase64?: string;
+  excelBase64?: string;
+  totalBills: number;
+  totalItemsSold: number;
+  totalDailySales: number;
+  totalsVerified: boolean;
+  triggerType: 'AUTO_SCHEDULED' | 'MANUAL_REGENERATE' | 'CATCHUP_MISSED';
+  timezone: string; // 'Asia/Kolkata'
+  closingTimeConfigured: string; // e.g. '23:00'
+  retryCount: number;
+  lastAttemptAt: number;
+  lastSuccessfulBackupAt?: number;
+  lastSuccessfulBackupFormatted?: string;
+  failureReason?: string;
+  initiatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
+export interface DailySalesBackupConfig {
+  enabled: boolean;
+  dailyClosingTime: string; // HH:mm in Asia/Kolkata timezone (e.g. '23:00')
+  timezone: string; // 'Asia/Kolkata'
+  autoRetryOnFailure: boolean;
+  maxRetries: number;
+  notifyOwnerOnFailure: boolean;
+  lastSuccessfulBackupDate?: string;
+  lastSuccessfulBackupAt?: number;
+  lastSuccessfulBackupFormatted?: string;
+  updatedBy?: string;
+  updatedAt: number;
+}
+
+export type SecurityAuditEventType =
+  | 'LOGIN_SUCCESS'
+  | 'LOGIN_FAILED'
+  | 'ACCOUNT_LOCKOUT'
+  | 'LOGOUT'
+  | 'UNAUTHORIZED_ACCESS_BLOCKED'
+  | 'REPORT_DOWNLOAD_PDF'
+  | 'REPORT_DOWNLOAD_EXCEL'
+  | 'DAILY_BACKUP_COMPLETED'
+  | 'DAILY_BACKUP_FAILED'
+  | 'DAILY_BACKUP_REGENERATED'
+  | 'CLOSING_TIME_UPDATED'
+  | 'USER_ROLE_CHANGED'
+  | 'PIN_CHANGED'
+  | 'DATA_MODIFIED';
+
+export interface SecurityAuditLogEntry {
+  id: string;
+  eventType: SecurityAuditEventType;
+  username: string;
+  userId?: string;
+  role?: string;
+  status: 'SUCCESS' | 'FAILED' | 'BLOCKED' | 'WARNING';
+  details: string;
+  timestamp: number;
+  formattedTimeIST: string;
+  deviceId?: string;
+  metadata?: Record<string, any>;
+}

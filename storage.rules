@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to verify authenticated POS session
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Daily Sales Backup folder structure:
+    // Daily_Sales_Backup/{YYYY}/{MM-MonthName}/SSB_{DD-MM-YYYY}.{pdf|xlsx}
+    // Never publicly accessible without authentication; only authorized POS sessions can read or write backup files.
+    match /Daily_Sales_Backup/{year}/{month}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+        && fileName.matches('^SSB_[0-9]{2}-[0-9]{2}-[0-9]{4}\\.(pdf|xlsx)$')
+        && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // Official restaurant brand assets
+    match /branding/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Default deny for all other unauthenticated paths
+    match /{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

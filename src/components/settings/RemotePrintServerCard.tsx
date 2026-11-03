@@ -12,7 +12,8 @@ import {
   Trash2, 
   Send,
   RefreshCw,
-  Server
+  Server,
+  Info
 } from 'lucide-react';
 import { RemotePrintQueueService } from '../../services/remotePrintQueueService';
 import { getDeviceId } from '../../services/firebase';
@@ -232,6 +233,17 @@ export const RemotePrintServerCard: React.FC<RemotePrintServerCardProps> = ({
             </div>
           </div>
         </button>
+      </div>
+
+      {/* Hardware vs Cloud Queue Clarification */}
+      <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 flex items-start gap-2.5">
+        <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <span className="font-bold text-amber-300">"Print Server" vs Physical Thermal Printer:</span>
+          <p className="text-slate-400 mt-0.5 leading-relaxed">
+            "Print Server ON" designates this device to listen for incoming wireless KOTs sent by waiter mobile phones via cloud queue. It does <em>not</em> detect whether your physical USB/Bluetooth thermal printer is plugged in or powered on. To test physical paper output or set margins, use the <strong>[TEST PRINT]</strong> in Thermal Receipt Settings.
+          </p>
+        </div>
       </div>
 
       {/* Additional Controls */}

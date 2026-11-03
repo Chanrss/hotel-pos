@@ -725,15 +725,15 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
             setActiveServicePeriod('ALL');
             e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
           }}
-          className={`snap-start h-8 px-3 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1.5 touch-manipulation ${
+          className={`snap-start h-8 px-3 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1.5 touch-manipulation ${
             selectedCategory === 'all'
-              ? 'bg-slate-900 text-amber-400 border-slate-900 font-black'
+              ? 'bg-[#0F172A] text-white border-[#0F172A] font-black shadow-2xs'
               : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
           }`}
         >
           <span>ALL</span>
           <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-            selectedCategory === 'all' ? 'bg-amber-500 text-slate-950' : 'bg-white text-slate-600'
+            selectedCategory === 'all' ? 'bg-emerald-500 text-slate-950' : 'bg-white text-slate-600'
           }`}>
             {totalUniqueItemsCount}
           </span>
@@ -755,15 +755,15 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                 else setActiveServicePeriod('ALL');
                 e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
               }}
-              className={`snap-start h-8 px-3 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1.5 touch-manipulation ${
+              className={`snap-start h-8 px-3 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1.5 touch-manipulation ${
                 isSelected
-                  ? 'bg-amber-500 text-slate-950 border-amber-600 font-black'
+                  ? 'bg-emerald-600 text-white border-emerald-600 font-black shadow-2xs'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
               <span>{cat.categoryName}</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                isSelected ? 'bg-slate-950 text-amber-400' : 'bg-slate-100 text-slate-600'
+                isSelected ? 'bg-[#0F172A] text-emerald-400' : 'bg-slate-100 text-slate-600'
               }`}>
                 {count}
               </span>
@@ -785,15 +785,15 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                   setSelectedCategory(cCat.id);
                   e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
                 }}
-                className={`snap-start h-8 px-2.5 rounded text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1 touch-manipulation ${
+                className={`snap-start h-8 px-2.5 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors cursor-pointer border shrink-0 flex items-center gap-1 touch-manipulation ${
                   isSelected
-                    ? 'bg-amber-500 text-slate-950 border-amber-600 font-black'
-                    : 'bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100'
+                    ? 'bg-emerald-600 text-white border-emerald-600 font-black'
+                    : 'bg-emerald-50/70 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
                 }`}
               >
                 <span>{cCat.categoryName}</span>
                 <span className={`text-[10px] px-1 py-0.2 rounded font-mono font-bold ${
-                  isSelected ? 'bg-slate-950 text-amber-400' : 'bg-amber-200/80 text-amber-950'
+                  isSelected ? 'bg-[#0F172A] text-emerald-400' : 'bg-emerald-200/80 text-emerald-950'
                 }`}>
                   {count}
                 </span>
@@ -814,7 +814,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
               placeholder="Search item name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-7 bg-white border border-slate-300 rounded pl-8 pr-6 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 font-medium"
+              className="w-full h-7 bg-white border border-slate-300 rounded-md pl-8 pr-6 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-600 font-medium"
             />
             {searchQuery && (
               <button
@@ -834,11 +834,11 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
               placeholder="Item Code (e.g. 17)"
               value={itemCodeInput}
               onChange={(e) => setItemCodeInput(e.target.value)}
-              className="w-28 sm:w-32 h-7 bg-white border border-slate-300 rounded px-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-amber-500 placeholder-slate-400"
+              className="w-28 sm:w-32 h-7 bg-white border border-slate-300 rounded-md px-2 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-600 placeholder-slate-400"
             />
             <button
               type="submit"
-              className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
               title="Enter item code & press Enter to add"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
@@ -850,7 +850,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
         {/* Right: AC/Non-AC, Dine-In/Takeaway, Table #, Status Toast */}
         <div className="flex items-center gap-1.5 flex-wrap shrink-0">
           {notification && (
-            <div className={`h-7 px-2.5 rounded text-2xs font-bold flex items-center gap-1.5 ${
+            <div className={`h-7 px-2.5 rounded-md text-2xs font-bold flex items-center gap-1.5 ${
               notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
             }`}>
               {notification.type === 'success' ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
@@ -859,13 +859,13 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
           )}
 
           {/* AC / Non-AC Switcher */}
-          <div className="flex items-center bg-slate-200 p-0.5 rounded border border-slate-300 h-7 shrink-0">
+          <div className="flex items-center bg-slate-200 p-0.5 rounded-md border border-slate-300 h-7 shrink-0">
             <button
               type="button"
               onClick={() => setPriceType('NON_AC')}
               className={`h-full px-2.5 rounded-xs text-xs font-bold transition-colors cursor-pointer ${
                 priceType === 'NON_AC'
-                  ? 'bg-slate-900 text-amber-400 font-black'
+                  ? 'bg-[#0F172A] text-white font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -876,7 +876,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
               onClick={() => setPriceType('AC')}
               className={`h-full px-2.5 rounded-xs text-xs font-bold transition-colors cursor-pointer ${
                 priceType === 'AC'
-                  ? 'bg-amber-500 text-slate-950 font-black'
+                  ? 'bg-[#0F172A] text-emerald-400 font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -885,13 +885,13 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
           </div>
 
           {/* Dine-In / Takeaway Switcher */}
-          <div className="flex items-center bg-slate-200 p-0.5 rounded border border-slate-300 h-7 shrink-0">
+          <div className="flex items-center bg-slate-200 p-0.5 rounded-md border border-slate-300 h-7 shrink-0">
             <button
               type="button"
               onClick={() => setOrderType('DINE_IN')}
               className={`h-full px-2.5 rounded-xs text-xs font-bold transition-colors cursor-pointer ${
                 orderType === 'DINE_IN'
-                  ? 'bg-blue-600 text-white font-black'
+                  ? 'bg-emerald-600 text-white font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -905,7 +905,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
               }}
               className={`h-full px-2.5 rounded-xs text-xs font-bold transition-colors cursor-pointer ${
                 orderType === 'TAKE_AWAY'
-                  ? 'bg-blue-600 text-white font-black'
+                  ? 'bg-emerald-600 text-white font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -914,12 +914,12 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
           </div>
 
           {/* Mobile View Switcher (Catalog vs Bill) */}
-          <div className="lg:hidden flex items-center bg-slate-200 p-0.5 rounded border border-slate-300 h-7">
+          <div className="lg:hidden flex items-center bg-slate-200 p-0.5 rounded-md border border-slate-300 h-7">
             <button
               type="button"
               onClick={() => setMobileTab('catalog')}
               className={`h-full px-2 rounded-xs text-2xs font-bold cursor-pointer ${
-                mobileTab === 'catalog' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-700'
+                mobileTab === 'catalog' ? 'bg-[#0F172A] text-white font-black' : 'text-slate-700'
               }`}
             >
               Menu ({filteredItems.length})
@@ -928,7 +928,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
               type="button"
               onClick={() => setMobileTab('cart')}
               className={`h-full px-2 rounded-xs text-2xs font-bold cursor-pointer ${
-                mobileTab === 'cart' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-700'
+                mobileTab === 'cart' ? 'bg-emerald-600 text-white font-black' : 'text-slate-700'
               }`}
             >
               Bill ({cart.reduce((s, i) => s + i.quantity, 0)})
@@ -965,12 +965,12 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                       key={item.id}
                       type="button"
                       onClick={() => handleAddToCart(item)}
-                      className="bg-white hover:bg-amber-50/50 active:bg-amber-100/60 border border-slate-200 hover:border-amber-400 rounded-lg p-2 flex flex-col justify-between text-left transition-colors group cursor-pointer"
+                      className="bg-white hover:bg-emerald-50/50 active:bg-emerald-100/60 border border-slate-200 hover:border-emerald-500 rounded-xl p-2 flex flex-col justify-between text-left transition-all shadow-2xs group cursor-pointer"
                     >
                       <div>
                         {/* Compact Top Row: Thumbnail Image + Item Code */}
                         <div className="flex items-center gap-2 mb-1.5">
-                          <div className="w-9 h-9 rounded bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                             {item.imageUrl ? (
                               <img
                                 src={item.imageUrl}
@@ -982,28 +982,28 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                                 }}
                               />
                             ) : (
-                              <Utensils className="w-4 h-4 text-amber-600" />
+                              <Utensils className="w-4 h-4 text-emerald-600" />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <span className="inline-block font-mono text-2xs text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
-                              Code: {item.itemCode}
+                            <span className="inline-block font-mono text-2xs text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded font-semibold">
+                              #{item.itemCode}
                             </span>
                           </div>
                         </div>
 
                         {/* Item Name (English only on POS screen) - Only item name in bold */}
-                        <div className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug group-hover:text-amber-950 min-h-[2.1rem]">
+                        <div className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug group-hover:text-emerald-950 min-h-[2.1rem]">
                           {item.itemName}
                         </div>
                       </div>
 
-                      {/* Selected Pricing Row: Clean display without black box, non-bold price */}
+                      {/* Selected Pricing Row */}
                       <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 font-mono text-2xs w-full">
-                        <span className={priceType === 'AC' ? 'text-amber-800 font-medium' : 'text-slate-400'}>
+                        <span className={priceType === 'AC' ? 'text-emerald-700 font-bold' : 'text-slate-400'}>
                           AC ₹{item.acPrice}
                         </span>
-                        <span className={priceType === 'NON_AC' ? 'text-slate-700 font-medium' : 'text-slate-400'}>
+                        <span className={priceType === 'NON_AC' ? 'text-slate-900 font-bold' : 'text-slate-400'}>
                           Non-AC ₹{item.nonAcPrice}
                         </span>
                       </div>
@@ -1035,11 +1035,11 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
         }`}>
           
           {/* Cart Header */}
-          <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between shrink-0">
+          <div className="px-3 py-2.5 bg-[#0F172A] text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <ShoppingBag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <ShoppingBag className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span className="font-extrabold text-xs uppercase tracking-wider truncate">Current Bill</span>
-              <span className="text-2xs font-mono font-bold bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded">
+              <span className="text-2xs font-mono font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded">
                 {cart.reduce((s, i) => s + i.quantity, 0)}
               </span>
             </div>
@@ -1051,7 +1051,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                   placeholder="Table #"
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}
-                  className="w-16 h-6 bg-slate-800 border border-slate-700 rounded px-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-400 placeholder-slate-400"
+                  className="w-16 h-6 bg-slate-800 border border-slate-700 rounded px-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-emerald-400 placeholder-slate-400"
                   title="Table Number"
                 />
               )}
@@ -1159,8 +1159,8 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                 type="button"
                 onClick={handleSaveOrder}
                 disabled={cart.length === 0 || saving}
-                className="h-9 px-2 rounded-lg text-2xs font-bold bg-blue-50 hover:bg-blue-100 disabled:opacity-40 text-blue-800 border border-blue-200 flex flex-col items-center justify-center cursor-pointer"
-                title="Save Order (F10)"
+                className="h-9 px-2 rounded-lg text-2xs font-bold bg-[#0F172A] hover:bg-slate-800 disabled:opacity-40 text-white border border-slate-800 flex flex-col items-center justify-center cursor-pointer"
+                title="Save Bill (F10)"
               >
                 <span>{saving ? '...' : 'Save [F10]'}</span>
               </button>
@@ -1169,7 +1169,7 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                 type="button"
                 onClick={handlePrintBill}
                 disabled={cart.length === 0 || saving}
-                className="col-span-2 h-9 px-3 rounded-lg text-xs font-black bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center gap-1.5 cursor-pointer"
+                className="col-span-2 h-9 px-3 rounded-lg text-xs font-black bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 title="Save & Print Bill (Ctrl + Enter)"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -1186,15 +1186,15 @@ export const PosScreen: React.FC<PosScreenProps> = ({ settings }) => {
                 className="text-red-600 hover:text-red-700 disabled:opacity-30 cursor-pointer font-semibold flex items-center gap-1"
               >
                 <Trash2 className="w-3 h-3" />
-                <span>Cancel [Esc]</span>
+                <span>Clear Bill [Esc]</span>
               </button>
               {heldBills.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShowHeldBillsModal(true)}
-                  className="text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded font-bold text-2xs cursor-pointer flex items-center gap-1"
+                  className="text-white bg-[#0F172A] hover:bg-slate-800 border border-slate-800 px-2 py-0.5 rounded font-bold text-2xs cursor-pointer flex items-center gap-1"
                 >
-                  <Layers className="w-3 h-3 text-amber-700" />
+                  <Layers className="w-3 h-3 text-emerald-400" />
                   <span>Held ({heldBills.length})</span>
                 </button>
               )}

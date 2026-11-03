@@ -28,7 +28,8 @@ import {
   Cloud,
   ChefHat,
   FileText,
-  Usb
+  Usb,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CartItem, MenuItem, OrderType, PriceType, RestaurantSettings, Bill, BillItem, Kot, KotItem } from '../../types';
@@ -338,16 +339,16 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
     setInputError((prev) => (prev !== null ? null : prev));
   }, [itemCodeInput, exactMatch, topMatch]);
 
-  // Autofocus Price Type or Item Code on initial mount
+  // Autofocus Item Code on initial mount for instant keyboard billing
   useEffect(() => {
     if (!loadingMenu) {
-      if (priceTypeRef.current) {
+      if (itemCodeRef.current) {
+        itemCodeRef.current.focus();
+        setFocusedStep('ITEM_CODE');
+      } else if (priceTypeRef.current) {
         priceTypeRef.current.focus();
         priceTypeRef.current.select();
         setFocusedStep('PRICE_TYPE');
-      } else if (itemCodeRef.current) {
-        itemCodeRef.current.focus();
-        setFocusedStep('ITEM_CODE');
       }
     }
   }, [loadingMenu]);
@@ -403,6 +404,15 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
       } else if (e.key === 'F10') {
         e.preventDefault();
         handleSaveBill(true, 'CASH');
+      } else if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (cart.length === 0) {
+          setInputError('Cart is empty. Add at least 1 item before saving.');
+          setTimeout(() => setInputError(null), 3000);
+          return;
+        }
+        handleSaveBill(false, 'CASH');
       } else if (e.key === 'Escape') {
         if (showSuggestions) {
           setShowSuggestions(false);
@@ -1256,12 +1266,12 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
       
       {/* Top Header Bar */}
       <div
-        className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-2.5 sm:px-3 py-1.5 gap-2 text-xs shadow-2xs shrink-0 w-full"
+        className="flex items-center justify-between bg-[#0F172A] text-white border border-slate-800 rounded-xl px-2.5 sm:px-3.5 py-2 gap-2 text-xs shadow-sm shrink-0 w-full"
       >
         
         {/* Left: App Title & Shop Logo */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-white border border-amber-400 shadow-2xs flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-white border border-emerald-400 shadow-2xs flex items-center justify-center p-0.5 shrink-0 overflow-hidden">
             <img 
               src={settings?.logoUrl || DEFAULT_RESTAURANT_LOGO} 
               alt={settings?.restaurantName || 'SRI SARAVANA BHAVAN'} 
@@ -1273,18 +1283,18 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               }}
             />
           </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-black text-xs sm:text-sm tracking-tight text-slate-900 uppercase leading-none truncate">Direct Billing</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-extrabold text-xs sm:text-sm tracking-tight text-white uppercase leading-none truncate">Direct Counter Billing</span>
               {autoSaveStatus === 'saving' && (
-                <span className="hidden xs:flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full animate-pulse">
-                  <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
-                  <span className="hidden sm:inline">Auto-saving draft...</span>
+                <span className="hidden xs:flex items-center gap-1 text-[11px] font-bold text-sky-300 bg-sky-950/80 border border-sky-800 px-1.5 py-0.5 rounded-md animate-pulse">
+                  <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
+                  <span className="hidden sm:inline">Saving draft...</span>
                 </span>
               )}
               {autoSaveStatus === 'saved' && cart.length > 0 && (
-                <span className="hidden xs:flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full" title="Current bill-in-progress is auto-saved to Firestore">
-                  <Cloud className="w-3 h-3 text-emerald-600" />
-                  <span className="hidden sm:inline">Cloud saved</span>
+                <span className="hidden xs:flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.5 rounded-md" title="Current bill-in-progress is auto-saved to Firestore">
+                  <Cloud className="w-3 h-3 text-emerald-400" />
+                  <span className="hidden sm:inline">Cloud Synced</span>
                 </span>
               )}
             </div>
@@ -1294,7 +1304,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
         <div className="flex items-center gap-1.5 shrink-0">
           {heldBills.length > 0 && (
             <div className="flex items-center gap-1">
-              <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-950/90 border border-emerald-800 px-2 py-1 rounded-lg font-mono">
                 Held: {heldBills.length}
               </span>
             </div>
@@ -1303,11 +1313,11 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
           <button
             type="button"
             onClick={handleReprintLastBill}
-            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs shrink-0"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
             title="Reprint last customer receipt (Shortcut: F7 or Alt+R)"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-            <span className="hidden sm:inline">
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline font-mono">
               {lastPrintedBill 
                 ? `Reprint #${lastPrintedBill.bill.billNumber} (₹${lastPrintedBill.bill.grandTotal})` 
                 : 'Reprint [F7]'}
@@ -1318,11 +1328,11 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
           <button
             type="button"
             onClick={handleNewBill}
-            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-            title="Start new customer bill"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#EA580C] hover:bg-[#D97706] text-white border border-[#EA580C] flex items-center gap-1 transition-colors cursor-pointer shrink-0 shadow-xs"
+            title="Start new customer bill / Clear current bill (F2)"
           >
-            <Plus className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden xs:inline">New Bill</span>
+            <Plus className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+            <span className="hidden xs:inline">New Bill [F2]</span>
             <span className="xs:hidden">New</span>
           </button>
         </div>
@@ -1331,9 +1341,9 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
 
       {/* Notifications */}
       {notification && (
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-xs animate-in fade-in shrink-0">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold shadow-xs animate-in fade-in shrink-0">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <CheckCircle className="w-4 h-4 text-[#2563EB] shrink-0" />
             <span>{notification.message}</span>
           </div>
           {lastPrintedBill && (
@@ -1353,7 +1363,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               <button
                 type="button"
                 onClick={handleReprintLastBill}
-                className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer"
+                className="px-2.5 py-1 rounded bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-[11px] font-bold cursor-pointer"
               >
                 Reprint
               </button>
@@ -1371,16 +1381,16 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
 
       {/* Held Bills Bar */}
       {heldBills.length > 0 && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-2 rounded-xl overflow-x-auto text-xs shrink-0">
-          <span className="font-bold text-amber-800 shrink-0">Held Bills:</span>
+        <div className="flex items-center gap-2 bg-slate-900 text-white border border-slate-800 p-2 rounded-xl overflow-x-auto text-xs shrink-0">
+          <span className="font-bold text-amber-400 shrink-0 uppercase tracking-wider text-[11px]">Held Bills:</span>
           {heldBills.map((hb) => (
             <button
               key={hb.id}
               onClick={() => handleRestoreHeldBill(hb.id)}
-              className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-medium shrink-0 flex items-center gap-1.5 cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-medium shrink-0 flex items-center gap-1.5 cursor-pointer"
             >
               <span>{hb.name}</span>
-              <span className="text-[10px] bg-amber-200 px-1 rounded font-bold">Restore</span>
+              <span className="text-[10px] bg-[#2563EB] text-white px-1.5 py-0.5 rounded font-bold">Restore</span>
             </button>
           ))}
         </div>
@@ -1391,17 +1401,17 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
         
         {/* TOP SECTION: DIRECT BILLING CONTROLS */}
         <div
-          className="bg-white border border-slate-200 rounded-xl p-2 sm:p-2.5 shadow-2xs shrink-0"
+          className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 shadow-2xs shrink-0"
         >
           
           {/* Full-Width Responsive Billing Input Controls with Clean Line Alignment */}
           <div className="flex flex-wrap items-start gap-2 sm:gap-2.5 w-full">
             
-            {/* 1. Price Mode */}
+            {/* 1. Price Mode (AC / Non-AC) */}
             <div className="order-1 w-[calc(50%-4px)] sm:w-[162px] shrink-0">
-              <div className="h-4 mb-1 flex items-center">
+              <div className="h-4 mb-1 flex items-center justify-between">
                 <label className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">
-                  Price Mode
+                  Hall / Tariff
                 </label>
               </div>
               <div 
@@ -1424,7 +1434,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                     priceTypeRef.current?.select();
                   }}
                   onKeyDown={handlePriceTypeKeyDown}
-                  className="w-7 h-7 sm:h-7.5 bg-white border border-slate-300 rounded text-center font-mono font-bold text-base sm:text-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shrink-0"
+                  className="w-7 h-7 sm:h-7.5 bg-white border border-slate-300 rounded text-center font-mono font-bold text-base sm:text-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB] shrink-0"
                   autoComplete="off"
                 />
                 <button
@@ -1432,13 +1442,12 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                   onClick={() => {
                     setPriceTypeChoice('1');
                     setPriceType('NON_AC');
-                    setFocusedStep('ORDER_TYPE');
-                    orderTypeRef.current?.focus();
-                    orderTypeRef.current?.select();
+                    setFocusedStep('ITEM_CODE');
+                    itemCodeRef.current?.focus();
                   }}
                   className={`flex-1 h-7 sm:h-7.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                     priceType === 'NON_AC'
-                      ? 'bg-white text-amber-700 shadow-2xs border border-slate-200'
+                      ? 'bg-[#2563EB] text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -1449,13 +1458,12 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                   onClick={() => {
                     setPriceTypeChoice('2');
                     setPriceType('AC');
-                    setFocusedStep('ORDER_TYPE');
-                    orderTypeRef.current?.focus();
-                    orderTypeRef.current?.select();
+                    setFocusedStep('ITEM_CODE');
+                    itemCodeRef.current?.focus();
                   }}
                   className={`flex-1 h-7 sm:h-7.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                     priceType === 'AC'
-                      ? 'bg-white text-amber-700 shadow-2xs border border-slate-200'
+                      ? 'bg-[#2563EB] text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -1464,15 +1472,15 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               </div>
             </div>
 
-            {/* 2. Order Type */}
-            <div className="order-2 w-[calc(50%-4px)] sm:w-[168px] shrink-0">
-              <div className="h-4 mb-1 flex items-center">
+            {/* 2. Order Type (Dine-In / Takeaway) */}
+            <div className="order-2 w-[calc(50%-4px)] sm:w-[190px] shrink-0">
+              <div className="h-4 mb-1 flex items-center justify-between">
                 <label className="text-[11px] sm:text-xs font-bold text-slate-700 truncate">
-                  Order Type
+                  Service Type
                 </label>
               </div>
               <div 
-                className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-blue-500 gap-1 h-8 sm:h-9 w-full"
+                className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 gap-1 h-8 sm:h-9 w-full"
               >
                 <input
                   ref={orderTypeRef}
@@ -1491,7 +1499,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                     orderTypeRef.current?.select();
                   }}
                   onKeyDown={handleOrderTypeKeyDown}
-                  className="w-7 h-7 sm:h-7.5 bg-white border border-slate-300 rounded text-center font-mono font-bold text-base sm:text-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
+                  className="w-7 h-7 sm:h-7.5 bg-white border border-slate-300 rounded text-center font-mono font-bold text-base sm:text-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB] shrink-0"
                   autoComplete="off"
                 />
                 <button
@@ -1502,9 +1510,9 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                     setFocusedStep('ITEM_CODE');
                     itemCodeRef.current?.focus();
                   }}
-                  className={`flex-1 h-7 sm:h-7.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                  className={`w-[70px] h-[30px] pl-0 ml-0 whitespace-nowrap shrink-0 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                     orderType === 'DINE_IN'
-                      ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
+                      ? 'bg-[#2563EB] text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -1518,30 +1526,30 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                     setFocusedStep('ITEM_CODE');
                     itemCodeRef.current?.focus();
                   }}
-                  className={`flex-1 h-7 sm:h-7.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-0.5 ${
+                  className={`flex-1 h-7 sm:h-7.5 whitespace-nowrap rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-0.5 ${
                     orderType === 'TAKE_AWAY'
-                      ? 'bg-white text-blue-700 shadow-2xs border border-slate-200'
+                      ? 'bg-[#2563EB] text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Receipt className="w-3 h-3 hidden xs:inline" /> Parcel
+                  <Receipt className="w-3 h-3 hidden xs:inline" /> Takeaway
                 </button>
               </div>
             </div>
 
             {/* 3. Item Code Input */}
-            <div className="order-3 w-[calc(55%-4px)] sm:w-[155px] shrink-0 relative">
+            <div className="order-3 w-[calc(55%-4px)] sm:w-[165px] shrink-0 relative">
               <div className="h-4 mb-1 flex items-center justify-between">
-                <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+                <label className="text-[11px] sm:text-xs font-bold text-slate-900">
                   Item Code
                 </label>
                 <button
                   type="button"
                   onClick={() => setSearchModalOpen(true)}
-                  className="text-[11px] text-amber-600 hover:text-amber-700 flex items-center gap-0.5 font-bold cursor-pointer"
-                  title="Search Items"
+                  className="text-[11px] text-[#D97706] hover:text-[#B45309] flex items-center gap-0.5 font-bold cursor-pointer"
+                  title="Search Items [F4]"
                 >
-                  <Search className="w-3 h-3" /> Search
+                  <Search className="w-3 h-3" /> Find [F4]
                 </button>
               </div>
 
@@ -1561,8 +1569,8 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                   }}
                   onKeyDown={handleItemCodeKeyDown}
                   placeholder="Code (e.g. 101)"
-                  className={`w-full h-8 sm:h-9 bg-slate-50 border rounded-lg px-2.5 text-base sm:text-lg font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-center tracking-wider ${
-                    focusedStep === 'ITEM_CODE' ? 'border-amber-500 ring-2 ring-amber-400/20' : 'border-slate-300'
+                  className={`w-full h-8 sm:h-9 bg-slate-50 border rounded-lg px-2.5 text-base sm:text-lg font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/25 transition-all text-center tracking-wider ${
+                    focusedStep === 'ITEM_CODE' ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/25 bg-white' : 'border-slate-300'
                   }`}
                   autoComplete="off"
                 />
@@ -1590,9 +1598,9 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                   ref={suggestionsContainerRef}
                   className="absolute left-0 w-72 sm:w-80 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-40 max-h-64 overflow-y-auto divide-y divide-slate-100 animate-in fade-in"
                 >
-                  <div className="p-2 bg-slate-50 text-xs text-slate-600 font-mono flex justify-between uppercase px-3 border-b border-slate-200">
-                    <span>Suggestions</span>
-                    <span>{matchingSuggestions.length} found</span>
+                  <div className="p-2 bg-[#0F172A] text-xs text-slate-200 font-mono flex justify-between uppercase px-3">
+                    <span>Matching Dishes</span>
+                    <span className="text-amber-400 font-bold">{matchingSuggestions.length} found</span>
                   </div>
                   {matchingSuggestions.map((item, idx) => {
                     const price = BillingEngine.getApplicablePrice(item, priceType);
@@ -1605,17 +1613,17 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                           selectItemAndFocusQty(item);
                         }}
                         className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                          isSelected ? 'bg-amber-50 text-amber-900 font-medium' : 'hover:bg-slate-50 text-slate-700'
+                          isSelected ? 'bg-blue-50 text-slate-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 pr-2">
-                          <span className="font-mono font-bold text-amber-700 text-xs bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                          <span className="font-mono font-bold text-slate-800 text-xs bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
                             #{item.itemCode}
                           </span>
                           <span className="font-medium text-xs sm:text-sm text-slate-900 truncate">{item.itemName}</span>
                         </div>
                         <div className="text-right font-mono shrink-0">
-                          <span className="font-bold text-amber-700 text-xs sm:text-sm">₹{price}</span>
+                          <span className="font-bold text-[#2563EB] text-xs sm:text-sm">₹{price}</span>
                         </div>
                       </div>
                     );
@@ -1626,10 +1634,15 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
 
             {/* 4. Quantity & Add Button */}
             <div className="order-4 w-[calc(45%-4px)] sm:w-auto md:order-5 shrink-0">
-              <div className="h-4 mb-1 flex items-center">
-                <label className="text-[11px] sm:text-xs font-bold text-slate-700">
+              <div className="h-4 mb-1 flex items-center justify-between gap-2">
+                <label className="text-[11px] sm:text-xs font-bold text-slate-900">
                   Quantity
                 </label>
+                {selectedMenuItem && (
+                  <span className="text-[11px] font-mono font-bold text-[#2563EB]">
+                    Amt: ₹{currentItemPrice * Math.max(1, parseInt(quantityInput, 10) || 1)}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 <input
@@ -1642,19 +1655,22 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                   onKeyDown={handleQuantityKeyDown}
                   disabled={!selectedMenuItem}
                   placeholder="1"
-                  className={`w-14 sm:w-16 h-8 sm:h-9 bg-white border rounded-lg text-center font-mono font-bold text-base sm:text-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-40 disabled:border-slate-200 ${
-                    focusedStep === 'QUANTITY' ? 'border-emerald-600 ring-2 ring-emerald-500/20' : 'border-slate-300'
+                  className={`w-14 sm:w-16 h-8 sm:h-9 bg-slate-50 border rounded-lg text-center font-mono font-bold text-base sm:text-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#3B82F6]/25 disabled:opacity-60 disabled:border-slate-200 ${
+                    focusedStep === 'QUANTITY' ? 'border-[#3B82F6] ring-2 ring-[#3B82F6]/25 bg-white' : 'border-slate-200'
                   }`}
                 />
                 <button
                   type="button"
-                  disabled={!selectedMenuItem}
                   onClick={() => {
+                    if (!selectedMenuItem) {
+                      itemCodeRef.current?.focus();
+                      return;
+                    }
                     const evt = { key: 'Enter', preventDefault: () => {} } as any;
                     handleQuantityKeyDown(evt);
                   }}
-                  className="px-3 sm:px-3.5 h-8 sm:h-9 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                  title="Add item to bill"
+                  className="px-3.5 sm:px-4 h-8 sm:h-9 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  title="Add item to bill (Enter)"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Add</span>
@@ -1662,15 +1678,15 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               </div>
             </div>
 
-            {/* 5. Selected Item & Rate Display */}
-            <div className="order-5 w-full md:order-4 md:flex-1 md:min-w-[180px]">
+            {/* 5. Selected Item, Rate & Automatic Item Total Display */}
+            <div className="order-5 w-full md:order-4 md:flex-1 md:min-w-[200px]">
               <div className="h-4 mb-1 flex items-center justify-between">
                 <label className="text-[11px] sm:text-xs font-bold text-slate-700">
-                  Selected Item
+                  Item Name & Price
                 </label>
                 {selectedMenuItem && (
-                  <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded font-bold">
-                    #{selectedMenuItem.itemCode}
+                  <span className="text-[11px] font-mono text-blue-800 bg-blue-100 px-1.5 py-0.2 rounded font-bold">
+                    #{selectedMenuItem.itemCode} • {priceType}
                   </span>
                 )}
               </div>
@@ -1678,7 +1694,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               <div 
                 className={`h-8 sm:h-9 rounded-lg px-2.5 border transition-all flex items-center justify-between gap-2 w-full ${
                   selectedMenuItem 
-                    ? 'bg-emerald-50/90 border-emerald-300 shadow-2xs' 
+                    ? 'bg-blue-50/90 border-blue-300 shadow-2xs' 
                     : 'bg-slate-50 border-slate-200 text-slate-400'
                 }`}
               >
@@ -1689,17 +1705,17 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                         {selectedMenuItem.itemName}
                       </span>
                     </div>
-                    <div className="text-right shrink-0 font-mono pl-2.5 border-l border-emerald-200 flex items-center gap-1">
-                      <span className="text-sm sm:text-base font-black text-emerald-800">
-                        ₹{currentItemPrice}
+                    <div className="text-right shrink-0 font-mono pl-2.5 border-l border-blue-200 flex items-center gap-2">
+                      <span className="text-xs text-slate-600 font-semibold">
+                        ₹{currentItemPrice} × {Math.max(1, parseInt(quantityInput, 10) || 1)} =
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-[#1D4ED8]">
+                        ₹{currentItemPrice * Math.max(1, parseInt(quantityInput, 10) || 1)}
                       </span>
                     </div>
                   </>
                 ) : (
-                  <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Utensils className="w-3.5 h-3.5 text-slate-300" />
-                    <span>Type code to select dish</span>
-                  </div>
+                  <div className="text-xs text-slate-400 flex items-center gap-1.5" />
                 )}
               </div>
             </div>
@@ -1712,17 +1728,11 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
         <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
           
           {/* Cart Header */}
-          <div className="px-4 py-2.5 sm:py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="px-4 py-2.5 sm:py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center">
-                <Receipt className="w-4 h-4 text-amber-700" />
-              </div>
               <span className="font-bold text-sm sm:text-base text-slate-900">Customer Bill</span>
               <span className="text-xs sm:text-sm text-slate-500 font-mono">
                 ({orderType === 'DINE_IN' ? 'Dine In' : 'Take Away'} • {priceType})
-              </span>
-              <span className="hidden md:inline text-xs text-slate-400 font-normal">
-                • Swipe left to remove
               </span>
             </div>
 
@@ -1745,21 +1755,7 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
 
           {/* Cart Items Table */}
           <div className="flex-1 p-2 sm:p-3 overflow-y-auto min-h-[140px]">
-            {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center p-6 space-y-2">
-                <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-2xs">
-                  <Receipt className="w-6 h-6 text-slate-400" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-slate-700">Cart is Empty</p>
-                  <p className="text-xs text-slate-500 max-w-sm">
-                    Enter an item code (e.g. <b className="text-amber-700">101</b>, <b className="text-amber-700">102</b>) or select from dishes above.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Mobile View: Compact Cards with Swipe-to-Delete */}
+            {/* Mobile View: Compact Cards with Swipe-to-Delete */}
                 <div className="sm:hidden space-y-2 font-sans">
                   <AnimatePresence initial={false}>
                     {cart.map((item, idx) => (
@@ -1862,100 +1858,100 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                 </div>
 
                 {/* Desktop View: Clean Table with Swipe-to-Delete Support */}
-                <table className="w-full text-base sm:text-lg text-left hidden sm:table">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 uppercase text-xs sm:text-sm tracking-wider bg-slate-50/50">
-                      <th className="py-2.5 pl-3 w-12">#</th>
-                      <th className="py-2.5 w-24">Code</th>
-                      <th className="py-2.5">Item Name</th>
-                      <th className="py-2.5 text-center w-36">Quantity</th>
-                      <th className="py-2.5 text-right w-24">Rate</th>
-                      <th className="py-2.5 text-right w-28">Total</th>
-                      <th className="py-2.5 text-center w-14" title="Swipe row left to remove">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono">
-                    <AnimatePresence initial={false}>
-                      {cart.map((item, idx) => (
-                        <motion.tr 
-                          key={`${item.itemId}_${item.priceType}`} 
-                          layout
-                          drag="x"
-                          dragDirectionLock
-                          dragConstraints={{ left: -140, right: 0 }}
-                          dragElastic={{ left: 0.5, right: 0.05 }}
-                          onDragEnd={(_, info) => {
-                            if (info.offset.x < -70 || info.velocity.x < -350) {
-                              handleRemoveFromCart(idx);
-                            }
-                          }}
-                          initial={{ opacity: 0, y: -6, backgroundColor: 'rgba(254, 243, 199, 0.45)' }}
-                          animate={{ opacity: 1, y: 0, backgroundColor: 'rgba(255, 255, 255, 0)', x: 0 }}
-                          exit={{ opacity: 0, x: -100, transition: { duration: 0.15 } }}
-                          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                          whileDrag={{ backgroundColor: 'rgba(254, 226, 226, 0.9)', boxShadow: '0 4px 12px rgba(220, 38, 38, 0.15)' }}
-                          className="hover:bg-slate-50/80 transition-colors cursor-grab active:cursor-grabbing touch-pan-y select-none"
-                        >
-                          <td className="py-2.5 pl-3 text-slate-400 text-xs sm:text-sm">{idx + 1}</td>
-                          <td className="py-2.5 font-bold text-amber-700 text-base sm:text-lg">#{item.itemCode}</td>
-                          <td className="py-2.5 font-sans">
-                            <div className="font-bold text-slate-900 text-base sm:text-lg flex items-center gap-2">
-                              <span>{item.itemName}</span>
-                              <button
-                                type="button"
+                <div className="w-full overflow-x-auto scrollbar-thin hidden sm:block">
+                  <table className="w-full min-w-[640px] text-base sm:text-lg text-left border-collapse">
+                    <thead className="sticky top-0 z-10 bg-slate-50">
+                      <tr className="border-b border-slate-200 text-slate-500 uppercase text-xs sm:text-sm tracking-wider bg-slate-50">
+                        <th className="py-2.5 pl-3 w-12 min-w-[44px] whitespace-nowrap">#</th>
+                        <th className="py-2.5 w-24 min-w-[85px] whitespace-nowrap">Code</th>
+                        <th className="py-2.5 min-w-[180px] whitespace-nowrap">Item Name</th>
+                        <th className="py-2.5 text-center w-36 min-w-[130px] whitespace-nowrap">Quantity</th>
+                        <th className="py-2.5 text-right w-24 min-w-[85px] whitespace-nowrap">Rate</th>
+                        <th className="py-2.5 text-right w-28 min-w-[100px] whitespace-nowrap">Total</th>
+                        <th className="py-2.5 text-center w-16 min-w-[64px] whitespace-nowrap" title="Swipe row left to remove">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono">
+                      <AnimatePresence initial={false}>
+                        {cart.map((item, idx) => (
+                          <motion.tr 
+                            key={`${item.itemId}_${item.priceType}`} 
+                            layout
+                            drag="x"
+                            dragDirectionLock
+                            dragConstraints={{ left: -140, right: 0 }}
+                            dragElastic={{ left: 0.5, right: 0.05 }}
+                            onDragEnd={(_, info) => {
+                              if (info.offset.x < -70 || info.velocity.x < -350) {
+                                handleRemoveFromCart(idx);
+                              }
+                            }}
+                            initial={{ opacity: 0, y: -6, backgroundColor: 'rgba(254, 243, 199, 0.45)' }}
+                            animate={{ opacity: 1, y: 0, backgroundColor: 'rgba(255, 55, 255, 0)', x: 0 }}
+                            exit={{ opacity: 0, x: -100, transition: { duration: 0.15 } }}
+                            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                            whileDrag={{ backgroundColor: 'rgba(254, 226, 226, 0.9)', boxShadow: '0 4px 12px rgba(220, 38, 38, 0.15)' }}
+                            className="hover:bg-slate-50/80 transition-colors cursor-grab active:cursor-grabbing touch-pan-y select-none"
+                          >
+                            <td className="py-2.5 pl-3 text-slate-400 text-xs sm:text-sm whitespace-nowrap">{idx + 1}</td>
+                            <td className="py-2.5 font-bold text-amber-700 text-base sm:text-lg whitespace-nowrap">#{item.itemCode}</td>
+                            <td className="py-2.5 font-sans">
+                              <div className="font-bold text-slate-900 text-base sm:text-lg flex items-center gap-2 whitespace-nowrap">
+                                <span>{item.itemName}</span>
+                                <button
+                                  type="button"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={() => setActiveItemNoteIdx(idx)}
+                                  className="text-xs text-slate-500 hover:text-amber-800 font-mono flex items-center gap-0.5 cursor-pointer bg-slate-100 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-slate-200"
+                                  title="Add Cooking Note"
+                                >
+                                  <SlidersHorizontal className="w-3 h-3 text-amber-600" />
+                                  <span>{item.notes ? item.notes : '+ Note'}</span>
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-2.5 text-center whitespace-nowrap">
+                              <div 
+                                className="inline-flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs"
                                 onPointerDown={(e) => e.stopPropagation()}
-                                onClick={() => setActiveItemNoteIdx(idx)}
-                                className="text-xs text-slate-500 hover:text-amber-800 font-mono flex items-center gap-0.5 cursor-pointer bg-slate-100 hover:bg-amber-50 px-1.5 py-0.5 rounded border border-slate-200"
-                                title="Add Cooking Note"
                               >
-                                <SlidersHorizontal className="w-3 h-3 text-amber-600" />
-                                <span>{item.notes ? item.notes : '+ Note'}</span>
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2.5 text-center">
-                            <div 
-                              className="inline-flex items-center gap-2 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs"
-                              onPointerDown={(e) => e.stopPropagation()}
-                            >
+                                <button
+                                  onClick={() => handleUpdateCartQty(idx, item.quantity - 1)}
+                                  className="text-slate-600 hover:text-amber-700 font-bold px-1.5 py-0.5 rounded hover:bg-slate-200 transition-colors cursor-pointer text-base"
+                                >
+                                  -
+                                </button>
+                                <span className="font-bold text-slate-900 text-base sm:text-lg min-w-[22px] text-center">{item.quantity}</span>
+                                <button
+                                  onClick={() => handleUpdateCartQty(idx, item.quantity + 1)}
+                                  className="text-slate-600 hover:text-amber-700 font-bold px-1.5 py-0.5 rounded hover:bg-slate-200 transition-colors cursor-pointer text-base"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-2.5 text-right text-slate-700 font-medium text-base sm:text-lg whitespace-nowrap">₹{item.unitPrice}</td>
+                            <td className="py-2.5 text-right font-black text-slate-900 text-lg sm:text-xl whitespace-nowrap">₹{item.totalPrice}</td>
+                            <td className="py-2.5 text-center whitespace-nowrap">
                               <button
-                                onClick={() => handleUpdateCartQty(idx, item.quantity - 1)}
-                                className="text-slate-600 hover:text-amber-700 font-bold px-1.5 py-0.5 rounded hover:bg-slate-200 transition-colors cursor-pointer text-base"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={() => handleRemoveFromCart(idx)}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                title="Remove item (or swipe left)"
                               >
-                                -
+                                <Trash2 className="w-4 h-4" />
                               </button>
-                              <span className="font-bold text-slate-900 text-base sm:text-lg min-w-[22px] text-center">{item.quantity}</span>
-                              <button
-                                onClick={() => handleUpdateCartQty(idx, item.quantity + 1)}
-                                className="text-slate-600 hover:text-amber-700 font-bold px-1.5 py-0.5 rounded hover:bg-slate-200 transition-colors cursor-pointer text-base"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2.5 text-right text-slate-700 font-medium text-base sm:text-lg">₹{item.unitPrice}</td>
-                          <td className="py-2.5 text-right font-black text-slate-900 text-lg sm:text-xl">₹{item.totalPrice}</td>
-                          <td className="py-2.5 text-center">
-                            <button
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onClick={() => handleRemoveFromCart(idx)}
-                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                              title="Remove item (or swipe left)"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </>
-            )}
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
           </div>
 
           {/* Totals & Calculations Section */}
-          <div className="bg-slate-50 border-t border-slate-200 p-3 sm:p-4 space-y-3 shrink-0">
+          <div className="bg-slate-50/70 border-t border-slate-200 p-3 sm:p-4 space-y-3 shrink-0">
             
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 items-stretch">
               
@@ -1965,9 +1961,9 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
               >
                 <div>
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider leading-tight">Subtotal</div>
-                  <div className="text-xs text-slate-500 leading-tight">{cart.reduce((s, i) => s + i.quantity, 0)} items</div>
+                  <div className="text-xs text-slate-500 leading-tight">{cart.reduce((s, i) => s + i.quantity, 0)} Items</div>
                 </div>
-                <div className="font-mono text-lg sm:text-xl font-bold text-slate-800">
+                <div className="font-mono text-lg sm:text-xl font-black text-slate-900">
                   ₹{subtotal}
                 </div>
               </div>
@@ -1994,22 +1990,22 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
                     value={customDiscount > 0 ? customDiscount : ''}
                     onChange={(e) => setCustomDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
                     placeholder="0"
-                    className="w-20 sm:w-24 h-9 bg-slate-50 border border-slate-200 rounded-lg px-2 text-right font-mono text-base sm:text-lg font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                    className="w-20 sm:w-24 h-9 bg-slate-100 border border-slate-200 rounded-lg px-2 text-right font-mono text-base sm:text-lg font-bold text-slate-700 focus:outline-none focus:border-[#2563EB]"
                   />
                 )}
               </div>
 
               {/* Net Payable Grand Total */}
               <div 
-                className="min-h-[54px] sm:min-h-[60px] col-span-2 sm:col-span-1 bg-emerald-600 text-white rounded-xl px-4 py-2 flex justify-between items-center shadow-md shadow-emerald-600/20"
+                className="min-h-[54px] sm:min-h-[60px] col-span-2 sm:col-span-1 bg-[#0F172A] text-white rounded-xl border-l-4 border-l-[#F59E0B] px-4 py-2 flex justify-between items-center shadow-md"
               >
                 <div>
-                  <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider leading-tight">Net Payable</div>
-                  <div className="text-xs text-emerald-100/90 font-mono leading-tight">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight">Net Payable</div>
+                  <div className="text-xs text-white font-semibold leading-tight">
                     {tenderedNum > 0 ? `Change: ₹${returnChange}` : 'Grand Total'}
                   </div>
                 </div>
-                <div className="font-mono text-xl sm:text-2xl font-black text-white tracking-tight">
+                <div className="font-mono text-xl sm:text-2xl font-black text-[#FBBF24] tracking-tight">
                   ₹{grandTotal}
                 </div>
               </div>
@@ -2017,84 +2013,61 @@ export const DirectBilling: React.FC<DirectBillingProps> = ({ settings }) => {
             </div>
 
             {/* Settle Action Buttons */}
-            <div className="flex gap-2.5 sm:gap-3 pt-0.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3 pt-0.5">
               
-              {/* Hold Bill */}
+              {/* 1. New / Clear Bill (Soft Rose Pink) */}
+              <button
+                type="button"
+                onClick={handleNewBill}
+                className="py-3 sm:py-3.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold bg-[#FFE4E6] hover:bg-[#FECDD3] text-[#9F1239] border border-[#F43F5E]/60 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+                title="Clear / New Bill (F2)"
+              >
+                <span>Clear Bill [F2]</span>
+              </button>
+
+              {/* 2. Hold Bill (Soft Warm Amber Cream) */}
               <button
                 type="button"
                 onClick={handleHoldBill}
-                disabled={cart.length === 0}
-                className="py-3 sm:py-3.5 px-4 sm:px-5 rounded-xl text-xs sm:text-sm font-bold bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 border border-slate-200 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs shrink-0"
+                className="py-3 sm:py-3.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold bg-[#FEF3C7] hover:bg-[#FDE68A] text-[#78350F] border border-[#D97706]/60 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
                 title="Hold current bill (F8)"
               >
-                <RotateCcw className="w-4 h-4 text-slate-500" />
-                <span className="hidden xs:inline">Hold Bill</span>
-                <span className="xs:hidden">Hold</span>
+                <span>Hold [F8]</span>
               </button>
 
-              {/* Send to Kitchen as KOT */}
+              {/* 3. Send to Kitchen as KOT (Vibrant Orange) */}
               <button
                 type="button"
                 onClick={() => handleCreateKotFromBilling(true)}
-                disabled={cart.length === 0 || saving}
-                className="py-3 sm:py-3.5 px-4 sm:px-5 rounded-xl text-xs sm:text-sm md:text-base font-bold bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-500/20 cursor-pointer active:scale-[0.99] shrink-0"
+                disabled={saving}
+                className="py-3 sm:py-3.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold bg-[#EA580C] hover:bg-[#C2410C] text-white border border-[#EA580C] flex items-center justify-center transition-all shadow-sm cursor-pointer active:scale-[0.99]"
                 title="Send to Kitchen as KOT (F9)"
               >
-                <ChefHat className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950" />
-                <span className="hidden xs:inline">Send KOT (F9)</span>
-                <span className="xs:hidden">KOT</span>
+                <span>Send KOT [F9]</span>
               </button>
 
-              {/* 1-Click Print & Settle */}
+              {/* 4. Save Bill Only (Vibrant Royal Blue) */}
+              <button
+                type="button"
+                onClick={() => handleSaveBill(false, 'CASH')}
+                disabled={saving}
+                className="py-3 sm:py-3.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold bg-[#2563EB] hover:bg-[#1D4ED8] text-white border border-[#2563EB] flex items-center justify-center transition-all shadow-sm cursor-pointer active:scale-[0.99]"
+                title="Save Bill without printing (Alt+S)"
+              >
+                <span>Save Bill [Alt+S]</span>
+              </button>
+
+              {/* 5. Print Bill (Rich Forest Green) */}
               <button
                 type="button"
                 onClick={() => handleSaveBill(true, 'CASH')}
-                disabled={cart.length === 0 || saving}
-                className="flex-1 py-3 sm:py-3.5 px-4 sm:px-6 rounded-xl text-sm sm:text-base font-black bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/20 cursor-pointer active:scale-[0.99]"
+                disabled={saving}
+                className="col-span-2 sm:col-span-1 py-3 sm:py-3.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold bg-[#15803D] hover:bg-[#166534] text-white border border-[#15803D] flex items-center justify-center transition-all shadow-md cursor-pointer active:scale-[0.99]"
                 title="Save and Print Bill (Tap [Ctrl] alone or [Ctrl+Enter])"
               >
-                <Printer className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
-                <span className="truncate">{saving ? 'Settling & Printing...' : `Print Bill [Ctrl+Enter] (₹${grandTotal})`}</span>
+                <span className="truncate">{saving ? 'Printing...' : `Print Bill [Ctrl+Enter] (₹${grandTotal})`}</span>
               </button>
 
-            </div>
-
-            <div className="text-[10px] text-slate-500 font-medium text-center flex items-center justify-center gap-1.5 pt-0.5 flex-wrap">
-              <span>⚡ Tap <strong className="text-slate-800 font-mono bg-slate-200 px-1 py-0.5 rounded text-[10px]">[Ctrl]</strong> key to print directly</span>
-              <span className="text-slate-300">•</span>
-              <button
-                type="button"
-                onClick={() => setIsHardwareModalOpen(true)}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors border ${
-                  PrinterConnectionService.isDirectHardwareReady()
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
-                    ? 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100'
-                    : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                }`}
-                title={
-                  PrinterConnectionService.isDirectHardwareReady()
-                    ? 'Direct Hardware Printer Ready: 0-Click ESC/POS printing (Click for settings)'
-                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
-                    ? 'System Spooler active (Click to pair Rugtek RP326 for 0-click print)'
-                    : 'No Hardware Printer Connected (Click to pair USB/Serial printer)'
-                }
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  PrinterConnectionService.isDirectHardwareReady()
-                    ? 'bg-emerald-500'
-                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
-                    ? 'bg-sky-500'
-                    : 'bg-amber-500 animate-pulse'
-                }`} />
-                <span>
-                  {PrinterConnectionService.isDirectHardwareReady()
-                    ? 'Hardware Printer Ready'
-                    : connectedPrinter.interfaceType === 'SYSTEM_SPOOLER'
-                    ? 'System Spooler (Pair Rugtek)'
-                    : 'Printer Not Connected'}
-                </span>
-              </button>
             </div>
 
           </div>

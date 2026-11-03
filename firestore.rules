@@ -108,6 +108,28 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Automatic Daily Sales Backup records (PDF & Excel metadata and cloud storage paths)
+    match /daily_sales_backups/{backupDateId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.businessDate is string
+        && request.resource.data.pdfFileName is string
+        && request.resource.data.excelFileName is string;
+      allow delete: if isAuthenticated();
+    }
+
+    // Security Audit Logs (immutable append-only audit trail for logins, failed PINs, lockouts, and downloads)
+    match /security_audit_logs/{logId} {
+      allow read: if true;
+      allow create: if request.resource.data.eventType is string
+        && request.resource.data.timestamp is number;
+      allow update, delete: if false;
+    }
+
+    // Login Rate Limits & Account Lockout state
+    match /login_rate_limits/{usernameId} {
+      allow read, write: if true;
+    }
+
     match /test/{testId} {
       allow read, write: if true;
     }

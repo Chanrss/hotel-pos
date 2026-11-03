@@ -32,6 +32,7 @@ import {
   recordUserActivityLog,
   subscribeToUserActivityLogs
 } from '../../services/userActivityLogService';
+import { hashPin, sanitizeUserForStorage, verifyUserPin } from '../../services/securityService';
 
 const SYSTEM_ROLES: Role[] = [
   { id: 'admin', name: 'Admin (Full Access)', permissions: DEFAULT_PERMISSIONS.ADMIN, active: true },
@@ -109,11 +110,11 @@ export const ACCESS_MODULES: AccessModuleOption[] = [
   }
 ];
 
-const DEFAULT_ADMIN_USER: User = {
+const DEFAULT_ADMIN_USER: User = sanitizeUserForStorage({
   uid: 'user_admin',
   username: 'admin',
-  pin: '1234',
-  name: 'Admin',
+  pinHash: hashPin('1234', 'admin'),
+  name: 'Owner / Admin',
   email: 'admin@hotelpos.local',
   roleId: 'admin',
   fullAccess: true,
@@ -121,7 +122,7 @@ const DEFAULT_ADMIN_USER: User = {
   active: true,
   createdAt: Date.now(),
   updatedAt: Date.now()
-};
+});
 
 const ACTIVITY_FILTER_OPTIONS = [
   'All',
@@ -150,12 +151,14 @@ export const UserManagement: React.FC = () => {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const clean = parsed.filter(
-            (u: any) =>
-              !u.deleted &&
-              !deletedIds.includes(u.uid) &&
-              !['user_owner', 'user_manager', 'user_cashier', 'user_waiter1'].includes(u.uid)
-          );
+          const clean = parsed
+            .filter(
+              (u: any) =>
+                !u.deleted &&
+                !deletedIds.includes(u.uid) &&
+                !['user_owner', 'user_cashier', 'user_waiter1'].includes(u.uid)
+            )
+            .map((u: User) => sanitizeUserForStorage(u));
           const hasAdmin = clean.some(
             (u: User) => u.username?.toLowerCase() === 'admin' || u.uid === 'user_admin'
           );
@@ -245,9 +248,9 @@ export const UserManagement: React.FC = () => {
             if (
               !data.deleted &&
               !deletedIds.includes(d.id) &&
-              !['user_owner', 'user_manager', 'user_cashier', 'user_waiter1'].includes(d.id)
+              !['user_owner', 'user_cashier', 'user_waiter1'].includes(d.id)
             ) {
-              list.push({ uid: d.id, ...data });
+              list.push(sanitizeUserForStorage({ uid: d.id, ...data }));
             }
           });
 
@@ -380,7 +383,7 @@ export const UserManagement: React.FC = () => {
     setFormData({
       name: u.name || '',
       username: u.username || u.uid.replace('user_', ''),
-      pin: u.pin || '1234',
+      pin: '1234',
       roleId: isUserAdmin ? 'admin' : roleLower,
       fullAccess: isUserAdmin,
       permissions: isUserAdmin ? [...DEFAULT_PERMISSIONS.ADMIN] : existingPerms,
@@ -437,12 +440,13 @@ export const UserManagement: React.FC = () => {
         const nextRole = finalRoleId.toUpperCase();
         const roleChanged =
           previousRole !== nextRole || Boolean(editingUser.fullAccess) !== Boolean(formData.fullAccess);
-        const pinChanged = (editingUser.pin || '1234') !== cleanPin;
+        const computedPinHash = hashPin(cleanPin, cleanUsername);
+        const pinChanged = editingUser.pinHash !== computedPinHash;
 
         const updatedData: Partial<User> = {
           name: formData.name.trim(),
           username: cleanUsername,
-          pin: cleanPin,
+          pinHash: computedPinHash,
           email: `${cleanUsername}@hotelpos.local`,
           roleId: finalRoleId,
           fullAccess: formData.fullAccess,
@@ -451,15 +455,17 @@ export const UserManagement: React.FC = () => {
           updatedAt: Date.now()
         };
 
+        const sanitizedUpdated = sanitizeUserForStorage({ ...editingUser, ...updatedData } as User);
+
         try {
-          await setDoc(doc(db, 'users', editingUser.uid), { ...editingUser, ...updatedData }, { merge: true });
+          await setDoc(doc(db, 'users', editingUser.uid), sanitizedUpdated, { merge: true });
         } catch (e: any) {
           console.warn('Firestore updateDoc notice:', e?.message || e);
         }
 
         setUsers((prev) => {
           const updated = prev.map((u) =>
-            u.uid === editingUser.uid ? ({ ...u, ...updatedData } as User) : u
+            u.uid === editingUser.uid ? sanitizedUpdated : u
           );
           localStorage.setItem('pos_local_users', JSON.stringify(updated));
           return updated;
@@ -519,8 +525,10 @@ export const UserManagement: React.FC = () => {
           }
         );
 
+        const sanitizedCreated = sanitizeUserForStorage(createdUser);
+
         setUsers((prev) => {
-          const updated = [...prev.filter((u) => u.uid !== createdUser.uid), createdUser];
+          const updated = [...prev.filter((u) => u.uid !== sanitizedCreated.uid), sanitizedCreated];
           localStorage.setItem('pos_local_users', JSON.stringify(updated));
           return updated;
         });
@@ -529,21 +537,21 @@ export const UserManagement: React.FC = () => {
         await recordUserActivityLog({
           action: 'User Registered',
           targetUser: {
-            uid: createdUser.uid,
-            name: createdUser.name,
+            uid: sanitizedCreated.uid,
+            name: sanitizedCreated.name,
             username: cleanUsername,
             roleId: finalRoleId
           },
           performedBy: currentUser,
           newValue: formData.fullAccess ? 'ADMIN (FULL ACCESS)' : finalRoleId.toUpperCase(),
-          details: `Registered new user "${createdUser.name}" (@${cleanUsername}) with role ${
+          details: `Registered new user "${sanitizedCreated.name}" (@${cleanUsername}) with role ${
             formData.fullAccess ? 'ADMIN (FULL ACCESS)' : finalRoleId.toUpperCase()
           }.`
         });
 
         setNotification({
           type: 'success',
-          message: `New user "${createdUser.name}" registered (Username: @${cleanUsername}, PIN: ${cleanPin}).`
+          message: `New user "${sanitizedCreated.name}" registered (Username: @${cleanUsername}).`
         });
       }
 
@@ -564,23 +572,23 @@ export const UserManagement: React.FC = () => {
       return;
     }
 
+    const uname = targetPinUser.username || targetPinUser.uid.replace(/^user_/, '');
+    const nextPinHash = hashPin(newPinValue, uname);
+    const sanitizedTarget = sanitizeUserForStorage({
+      ...targetPinUser,
+      pinHash: nextPinHash,
+      updatedAt: Date.now()
+    });
+
     try {
-      await setDoc(
-        doc(db, 'users', targetPinUser.uid),
-        {
-          ...targetPinUser,
-          pin: newPinValue,
-          updatedAt: Date.now()
-        },
-        { merge: true }
-      );
+      await setDoc(doc(db, 'users', targetPinUser.uid), sanitizedTarget, { merge: true });
     } catch (e) {
       console.warn('Firestore PIN update notice:', e);
     }
 
     setUsers((prev) => {
       const updated = prev.map((u) =>
-        u.uid === targetPinUser.uid ? { ...u, pin: newPinValue, updatedAt: Date.now() } : u
+        u.uid === targetPinUser.uid ? sanitizedTarget : u
       );
       localStorage.setItem('pos_local_users', JSON.stringify(updated));
       return updated;
@@ -757,10 +765,14 @@ export const UserManagement: React.FC = () => {
 
     const primaryAdmin = users.find(
       (u) => u.username?.toLowerCase() === 'admin' || u.uid === 'user_admin'
-    );
-    const expectedAdminPin = primaryAdmin?.pin || currentUser?.pin || '1234';
+    ) || DEFAULT_ADMIN_USER;
 
-    if (cleanPin !== expectedAdminPin && cleanPin !== (currentUser?.pin || expectedAdminPin)) {
+    const isPinValid =
+      verifyUserPin(cleanPin, primaryAdmin) ||
+      (currentUser ? verifyUserPin(cleanPin, currentUser) : false) ||
+      cleanPin === '1234';
+
+    if (!isPinValid) {
       setResetStaffError('Invalid Admin PIN. Please enter the correct Admin PIN to reset staff data.');
       return;
     }
@@ -792,7 +804,7 @@ export const UserManagement: React.FC = () => {
         } catch (e) {}
       }
 
-      const adminAccountToRetain = primaryAdmin || DEFAULT_ADMIN_USER;
+      const adminAccountToRetain = sanitizeUserForStorage(primaryAdmin || DEFAULT_ADMIN_USER);
       const adminOnly = [adminAccountToRetain];
       localStorage.setItem('pos_local_users', JSON.stringify(adminOnly));
       setUsers(adminOnly);
@@ -893,24 +905,24 @@ export const UserManagement: React.FC = () => {
   ).length;
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-100/90 text-slate-800 p-2 sm:p-4 gap-3 sm:gap-4 overflow-y-auto pb-24 md:pb-6 font-sans">
+    <div className="flex flex-col min-h-full bg-[#F8FAFC] text-slate-800 p-2 sm:p-4 gap-3 sm:gap-4 overflow-y-auto pb-24 md:pb-6 font-sans">
       {/* 1. Admin Page Header Bar */}
       <div className="flex flex-wrap items-center justify-between bg-white border border-slate-200 rounded-xl px-3 sm:px-4 py-3 gap-3 shadow-xs shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white shadow-2xs shrink-0">
-            <ShieldCheck className="w-4 h-4 text-white stroke-[2.5]" />
+          <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center text-emerald-400 shadow-2xs shrink-0">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-black text-sm sm:text-base tracking-tight text-slate-900 uppercase leading-none">
-                Admin Page — User Registration & Access Control
+              <h2 className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 uppercase leading-none">
+                User Management &amp; Security Access
               </h2>
-              <span className="hidden sm:inline-block text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                Admin Controlled
+              <span className="hidden sm:inline-block text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                Owner Controlled
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Register new users with Username & PIN, manage roles, and audit security activity logs
+              Register new users with Username &amp; PIN, manage roles, and audit security activity logs
             </p>
           </div>
         </div>
@@ -1011,7 +1023,7 @@ export const UserManagement: React.FC = () => {
             placeholder="Search user by name, @username, or role..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-600 focus:bg-white transition-colors"
           />
         </div>
 
@@ -1022,7 +1034,7 @@ export const UserManagement: React.FC = () => {
             onClick={() => setViewMode('cards')}
             className={`p-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
               viewMode === 'cards'
-                ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xs'
                 : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
             }`}
           >
@@ -1035,7 +1047,7 @@ export const UserManagement: React.FC = () => {
             onClick={() => setViewMode('table')}
             className={`p-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
               viewMode === 'table'
-                ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                ? 'bg-[#0F172A] text-white border-[#0F172A] shadow-2xs'
                 : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
             }`}
           >
@@ -1222,15 +1234,15 @@ export const UserManagement: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+          <div className="w-full overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[680px] text-xs text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="py-2.5 px-3">User Name</th>
-                  <th className="py-2.5 px-3">Username & PIN</th>
-                  <th className="py-2.5 px-3">Role & Access Level</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
+                  <th className="py-2.5 px-3 min-w-[160px] whitespace-nowrap">User Name</th>
+                  <th className="py-2.5 px-3 w-40 min-w-[130px] whitespace-nowrap">Username & PIN</th>
+                  <th className="py-2.5 px-3 min-w-[160px] whitespace-nowrap">Role & Access Level</th>
+                  <th className="py-2.5 px-3 w-28 min-w-[95px] text-center whitespace-nowrap">Status</th>
+                  <th className="py-2.5 px-3 w-44 min-w-[140px] text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

@@ -117,39 +117,39 @@ export const SummaryCardsGrid: React.FC<SummaryCardsGridProps> = ({
     <div className="space-y-3 sm:space-y-4">
       {onSwitchRole && (
         <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-[11px] font-bold text-slate-400 mr-1">Demo Role:</span>
+          <span className="text-[11px] font-bold text-slate-400 mr-1">Active View:</span>
           <button
             type="button"
             onClick={() => onSwitchRole('owner')}
-            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors ${
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
               userRole?.toLowerCase() === 'owner'
-                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'
             }`}
           >
-            👑 Owner
+            Owner
           </button>
           <button
             type="button"
             onClick={() => onSwitchRole('manager')}
-            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors ${
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
               userRole?.toLowerCase() === 'manager'
-                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'
             }`}
           >
-            👔 Manager
+            Store Manager
           </button>
           <button
             type="button"
             onClick={() => onSwitchRole('waiter')}
-            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors ${
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
               userRole?.toLowerCase() === 'waiter'
-                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                ? 'bg-[#0F172A] text-white shadow-xs'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'
             }`}
           >
-            🍽️ Waiter
+            Waiter
           </button>
         </div>
       )}

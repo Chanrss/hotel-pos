@@ -13,7 +13,8 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Bill, BillItem, RestaurantSettings } from '../../types';
@@ -26,6 +27,8 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 import { db } from '../../services/firebase';
 import { MonthlyCalendarPicker } from '../common/MonthlyCalendarPicker';
 import { getLocalBills, mergeBills, subscribeToLocalBills } from '../../services/localBillStore';
+import { purgeAllBills } from '../../services/billCleanupService';
+import { calculateDailyNetSales, isBillSuperseded, getReplacementBill } from '../../services/salesCalculationEngine';
 
 interface BillHistoryReprintProps {
   settings?: RestaurantSettings;
@@ -67,10 +70,40 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
+  // Erase all bills modal state
+  const [eraseModalOpen, setEraseModalOpen] = useState(false);
+  const [erasing, setErasing] = useState(false);
+
   // Thermal modal & Reprint Preview
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [reprinting, setReprinting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Erase all bills from software (cloud and local)
+  const handleEraseAllBills = async () => {
+    setErasing(true);
+    try {
+      const res = await purgeAllBills();
+      setBills([]);
+      setSelectedBill(null);
+      setSelectedBillItems([]);
+      setEraseModalOpen(false);
+      setNotification({
+        type: 'success',
+        message: `All bills erased successfully (${res.billsDeleted} deleted). Next bill will start from #01!`
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err: any) {
+      console.error('Erase bills error:', err);
+      setNotification({
+        type: 'error',
+        message: 'Failed to erase bills: ' + (err?.message || 'Unknown error')
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } finally {
+      setErasing(false);
+    }
+  };
 
   // Fetch recent bills (with local storage merge and real-time subscription)
   useEffect(() => {
@@ -81,12 +114,25 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
       setLoading(false);
     }
 
-    // 2. Listen to local bills updates (when new bills are saved in DirectBilling/POS)
+    // 2. Listen to local bills updates (when new bills are saved or cleared in POS)
     const unsubLocal = subscribeToLocalBills(() => {
-      setBills((prev) => mergeBills(prev, getLocalBills()));
+      const currentLocal = getLocalBills();
+      if (currentLocal.length === 0) {
+        setBills([]);
+      } else {
+        setBills((prev) => mergeBills(prev, currentLocal));
+      }
     });
 
-    // 3. Listen to Firestore collection
+    // 3. Listen to remote bills erased event
+    const handleErased = () => {
+      setBills([]);
+      setSelectedBill(null);
+      setSelectedBillItems([]);
+    };
+    window.addEventListener('pos_bills_erased', handleErased);
+
+    // 4. Listen to Firestore collection
     let unsubFirestore: (() => void) | undefined;
     try {
       const q = query(collection(db, 'bills'), orderBy('createdAt', 'desc'), limit(200));
@@ -95,7 +141,12 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
         (snap) => {
           const remoteList: Bill[] = [];
           snap.forEach((d) => remoteList.push({ id: d.id, ...d.data() } as Bill));
-          setBills(mergeBills(remoteList, getLocalBills()));
+          const currentLocal = getLocalBills();
+          if (remoteList.length === 0 && currentLocal.length === 0) {
+            setBills([]);
+          } else {
+            setBills(mergeBills(remoteList, currentLocal));
+          }
           setLoading(false);
         },
         (err) => {
@@ -113,11 +164,19 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     return () => {
       unsubLocal();
       if (unsubFirestore) unsubFirestore();
+      window.removeEventListener('pos_bills_erased', handleErased);
     };
   }, []);
 
   const handleSelectBill = async (bill: Bill) => {
     setSelectedBill(bill);
+    // If bill already contains items, use them immediately to prevent empty view
+    if (bill.items && bill.items.length > 0) {
+      setSelectedBillItems(bill.items);
+      setLoadingItems(false);
+      return;
+    }
+
     setLoadingItems(true);
     try {
       const items = await ReprintEngine.getBillItems(bill.id);
@@ -156,7 +215,9 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     setReprinting(true);
     try {
       // 1. Ensure bill items are loaded
-      let itemsToPrint = (selectedBill?.id === targetBill.id && selectedBillItems.length > 0)
+      let itemsToPrint = (targetBill.items && targetBill.items.length > 0)
+        ? targetBill.items
+        : (selectedBill?.id === targetBill.id && selectedBillItems.length > 0)
         ? selectedBillItems
         : [];
 
@@ -211,6 +272,12 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     if (!targetBill) return;
 
     setSelectedBill(targetBill);
+
+    if (targetBill.items && targetBill.items.length > 0) {
+      setSelectedBillItems(targetBill.items);
+      setIsReceiptOpen(true);
+      return;
+    }
 
     // If items are not loaded yet or bill changed, fetch items first
     if (selectedBill?.id !== targetBill.id || selectedBillItems.length === 0) {
@@ -309,6 +376,16 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     });
   }, [bills, startDate, endDate, searchNumber]);
 
+  // Daily Net Sales calculation strictly following SRI SARAVANABHAVAN POS rules:
+  // - Deduplicates bills and reprints (printing again never increases sales)
+  // - Excludes cancelled bills (deducted immediately from net total)
+  // - Handles re-bills (only counts valid replacement bill, excludes superseded)
+  const salesBreakdown = useMemo(() => {
+    return calculateDailyNetSales(filteredBills);
+  }, [filteredBills]);
+
+  const overallActiveTotal = salesBreakdown.netSales;
+
   // 2. Group filtered bills by businessDate (Day-by-Day)
   const groupedBillsByDate = useMemo(() => {
     const groups: { [date: string]: Bill[] } = {};
@@ -324,14 +401,17 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
     return sortedDates.map((date) => {
       const dateBills = groups[date].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      const totalAmount = dateBills.reduce((sum, b) => b.status === 'COMPLETED' ? sum + b.grandTotal : sum, 0);
+      const dayBreakdown = calculateDailyNetSales(dateBills);
       const isToday = date === todayBusinessDate;
       return {
         date,
         isToday,
         bills: dateBills,
         billCount: dateBills.length,
-        totalAmount
+        activeBillCount: dayBreakdown.validBillCount,
+        cancelledCount: dayBreakdown.cancelledCount,
+        cancelledAmount: dayBreakdown.cancelledAmount,
+        totalAmount: dayBreakdown.netSales
       };
     });
   }, [filteredBills, todayBusinessDate]);
@@ -356,27 +436,29 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
     <div className="flex flex-col min-h-full bg-slate-100 text-slate-800 p-2.5 sm:p-4 gap-3 overflow-y-auto font-sans pb-24 md:pb-6">
       
       {/* Top Search & Filter Bar */}
-      <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-amber-600" />
+      <div className="bg-[#0F172A] text-white border border-slate-800 p-3.5 sm:p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <Receipt className="w-4 h-4 text-emerald-400" />
+          </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-sm sm:text-base tracking-wide text-slate-900">
-                Bill History & Thermal Reprint
+              <h2 className="font-extrabold text-sm sm:text-base tracking-tight text-white">
+                Bill History &amp; Thermal Reprint
               </h2>
               {isPresentDayOnly ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full shadow-2xs">
-                  <Sparkles className="w-3 h-3 text-emerald-600" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950 border border-emerald-700/60 px-2 py-0.5 rounded-md shadow-2xs">
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
                   Present Day
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-full shadow-2xs">
-                  <Calendar className="w-3 h-3 text-amber-600" />
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-300 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-md shadow-2xs">
+                  <Calendar className="w-3 h-3 text-emerald-400" />
                   Day-by-Day History
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-500 hidden sm:block">
+            <p className="text-[11px] text-slate-400 hidden sm:block">
               {isPresentDayOnly
                 ? `Showing present bills for today (${todayBusinessDate}). Use date filter for day-by-day past records.`
                 : `Showing bills grouped day-by-day from ${startDate} to ${endDate}.`}
@@ -389,10 +471,10 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
             <button
               type="button"
               onClick={handleResetToPresentDay}
-              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-bold rounded-xl transition-colors cursor-pointer border border-slate-300 flex items-center gap-1 shadow-2xs"
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer border border-slate-700 flex items-center gap-1 shadow-2xs"
               title="Return to showing only present day's bills"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
               <span>Today's Bills</span>
             </button>
           )}
@@ -415,16 +497,28 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
                 placeholder="Search Bill No (e.g. 01, 023)..."
                 value={searchNumber || ''}
                 onChange={(e) => setSearchNumber(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 font-mono w-44 sm:w-52"
+                className="bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono w-44 sm:w-52"
               />
             </div>
             <button
               type="submit"
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-xs"
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-xs"
             >
               Find
             </button>
           </form>
+
+          {/* Quick Erase All Bills Button */}
+          <button
+            type="button"
+            onClick={() => setEraseModalOpen(true)}
+            className="px-2.5 py-1.5 bg-red-950/60 hover:bg-red-900/80 text-red-200 hover:text-white text-xs font-bold rounded-xl transition-colors cursor-pointer border border-red-800/60 flex items-center gap-1 shadow-2xs"
+            title="Erase all bills and reset bill counter"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden sm:inline">Erase All Bills</span>
+            <span className="sm:hidden">Erase</span>
+          </button>
         </div>
       </div>
 
@@ -445,10 +539,10 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
         
         {/* Left Column: Bills Table with Day-by-Day Sections (7 cols) */}
         <div className="lg:col-span-7 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs min-h-[340px] lg:min-h-0">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs font-semibold text-slate-700 shrink-0">
+          <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center text-xs font-semibold text-slate-700 shrink-0 gap-2">
             <div className="flex items-center gap-2">
               <span>
-                {isPresentDayOnly ? "Present Day's Bills" : "Bills History"} ({filteredBills.length})
+                {isPresentDayOnly ? "Present Day's Orders" : "Orders History"} ({filteredBills.length})
               </span>
               {!isPresentDayOnly && (
                 <span className="text-[11px] text-slate-500 font-normal">
@@ -456,7 +550,12 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
                 </span>
               )}
             </div>
-            <span className="text-[11px] text-slate-500">Sorted by newest</span>
+            <div className="flex items-center gap-2 font-mono">
+              <span className="text-slate-500 text-[11px]">Total Net Sales:</span>
+              <span className="text-emerald-700 font-black text-xs sm:text-sm">
+                ₹{overallActiveTotal.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           <div className="flex-1 overflow-x-auto overflow-y-auto">
@@ -523,8 +622,13 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
 
                         <div className="flex items-center gap-3">
                           <span className="font-mono text-xs font-bold text-slate-800">
-                            Total: <span className="text-emerald-700 font-black">₹{group.totalAmount.toLocaleString()}</span>
+                            Total: <span className="text-emerald-700 font-black">₹{group.totalAmount.toFixed(2)}</span>
                           </span>
+                          {group.cancelledCount > 0 && (
+                            <span className="text-[10px] text-red-600 font-semibold bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                              {group.cancelledCount} cancelled
+                            </span>
+                          )}
                           <span className="text-[10px] text-slate-400 font-sans">
                             {isCollapsed ? 'Click to expand' : 'Click to collapse'}
                           </span>
@@ -533,91 +637,127 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
 
                       {/* Day Bills Table */}
                       {!isCollapsed && (
-                        <table className="w-full text-xs text-left min-w-[500px] sm:min-w-full">
-                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px]">
-                            <tr>
-                              <th className="py-2 pl-3">Bill #</th>
-                              <th className="py-2">Time</th>
-                              <th className="py-2">Type</th>
-                              <th className="py-2 text-right">Grand Total</th>
-                              <th className="py-2 text-center">Status</th>
-                              <th className="py-2 text-center pr-3">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 font-mono bg-white">
-                            {group.bills.map((b) => (
-                              <tr
-                                key={b.id}
-                                onClick={() => handleSelectBill(b)}
-                                className={`hover:bg-slate-50 cursor-pointer transition-colors ${
-                                  selectedBill?.id === b.id ? 'bg-amber-50/70 border-l-2 border-amber-500' : ''
-                                }`}
-                              >
-                                <td className="py-2.5 pl-3 font-bold text-amber-700">
-                                  {b.billNumber}
-                                  {b.reprintCount > 0 && (
-                                    <span className="ml-1 text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-md">
-                                      R:{b.reprintCount}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-2.5 text-slate-700 font-sans">
-                                  <div className="text-[11px] font-mono text-slate-700 flex items-center gap-1">
-                                    <Clock className="w-3 h-3 text-slate-400" />
-                                    {new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </div>
-                                  {b.userName && (
-                                    <div className="text-[10px] text-slate-500 truncate max-w-[120px]">
-                                      {b.userName}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="py-2.5 text-slate-600 font-sans text-[11px]">
-                                  <div>{b.orderType === 'DINE_IN' ? 'Dine In' : 'Take Away'}</div>
-                                  <div className="text-[10px] text-amber-700 font-mono">{b.priceType}</div>
-                                </td>
-                                <td className="py-2.5 text-right font-bold text-slate-900 text-sm">
-                                  ₹{b.grandTotal}
-                                </td>
-                                <td className="py-2.5 text-center">
-                                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full ${
-                                    b.status === 'COMPLETED'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-red-50 text-red-700 border border-red-200'
-                                  }`}>
-                                    {b.status}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 text-center pr-3">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSelectBill(b);
-                                      }}
-                                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                                      title="View bill details"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDirectReprint(b);
-                                      }}
-                                      className="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
-                                      title={`Direct Thermal Reprint Bill #${b.billNumber}`}
-                                    >
-                                      <Printer className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
+                        <div className="w-full overflow-x-auto scrollbar-thin">
+                          <table className="w-full min-w-[560px] text-xs text-left border-collapse">
+                            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px]">
+                              <tr>
+                                <th className="py-2 pl-3 pr-2 w-28 min-w-[100px] whitespace-nowrap">Bill #</th>
+                                <th className="py-2 px-2 w-28 min-w-[105px] whitespace-nowrap">Time</th>
+                                <th className="py-2 px-2 w-24 min-w-[90px] whitespace-nowrap">Type</th>
+                                <th className="py-2 px-2 w-28 min-w-[100px] text-right whitespace-nowrap">Grand Total</th>
+                                <th className="py-2 px-2 w-24 min-w-[90px] text-center whitespace-nowrap">Status</th>
+                                <th className="py-2 pl-2 pr-3 w-20 min-w-[80px] text-center whitespace-nowrap">Actions</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-mono bg-white">
+                              {group.bills.map((b) => {
+                                const isCancelled = String(b.status || '').toUpperCase() === 'CANCELLED';
+                                const isSuperseded = isBillSuperseded(b, group.bills);
+                                const isRebill = Boolean(b.isRebill || b.originalBillId || b.replacesBillNumber);
+                                const isExcludedFromNet = isCancelled || isSuperseded;
+                                const replacement = isSuperseded ? getReplacementBill(b, group.bills) : undefined;
+
+                                return (
+                                  <tr
+                                    key={b.id}
+                                    onClick={() => handleSelectBill(b)}
+                                    className={`hover:bg-slate-50 cursor-pointer transition-colors ${
+                                      selectedBill?.id === b.id ? 'bg-amber-50/70 border-l-2 border-amber-500' : ''
+                                    }`}
+                                  >
+                                    <td className="py-2.5 pl-3 pr-2 font-bold text-amber-700 whitespace-nowrap">
+                                      <span>{b.billNumber}</span>
+                                      {b.reprintCount > 0 && (
+                                        <span className="ml-1 text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-md" title={`Reprinted ${b.reprintCount} times (no effect on Net Sales)`}>
+                                          R:{b.reprintCount}
+                                        </span>
+                                      )}
+                                      {isRebill && (
+                                        <span className="ml-1 text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded-md" title={`Replacement bill for #${b.replacesBillNumber || 'original'}`}>
+                                          Re-bill
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-slate-700 font-sans whitespace-nowrap">
+                                      <div className="text-[11px] font-mono text-slate-700 flex items-center gap-1">
+                                        <Clock className="w-3 h-3 text-slate-400" />
+                                        {new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                      {b.userName && (
+                                        <div className="text-[10px] text-slate-500 truncate max-w-[120px]">
+                                          {b.userName}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-slate-600 font-sans text-[11px] whitespace-nowrap">
+                                      <div>{b.orderType === 'DINE_IN' ? 'Dine In' : 'Take Away'}</div>
+                                      <div className="text-[10px] text-amber-700 font-mono">{b.priceType}</div>
+                                    </td>
+                                    <td className="py-2.5 px-2 text-right font-bold text-sm whitespace-nowrap">
+                                      {isExcludedFromNet ? (
+                                        <span
+                                          className="line-through text-slate-400 font-normal"
+                                          title={isCancelled ? "Cancelled Bill (Excluded from Net Sales)" : `Superseded by Re-bill #${replacement?.billNumber || ''} (Excluded from Net Sales)`}
+                                        >
+                                          ₹{Number(b.grandTotal !== undefined && b.grandTotal !== null ? b.grandTotal : (b.subtotal || 0)).toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-900 font-bold">
+                                          ₹{Number(b.grandTotal !== undefined && b.grandTotal !== null ? b.grandTotal : (b.subtotal || 0)).toFixed(2)}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                      {isCancelled ? (
+                                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                                          Cancelled
+                                        </span>
+                                      ) : isSuperseded ? (
+                                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title={`Replaced by bill #${replacement?.billNumber || ''}`}>
+                                          Replaced
+                                        </span>
+                                      ) : isRebill ? (
+                                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                                          Re-bill
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          Completed
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 pl-2 pr-3 text-center whitespace-nowrap">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSelectBill(b);
+                                          }}
+                                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                          title="View bill details"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDirectReprint(b);
+                                          }}
+                                          className="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                                          title={`Direct Thermal Reprint Bill #${b.billNumber}`}
+                                        >
+                                          <Printer className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
                     </div>
                   );
@@ -661,53 +801,126 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
               {/* Items Table */}
               <div className="flex-1 p-3 overflow-y-auto space-y-3">
                 {selectedBill.status === 'CANCELLED' && (
-                  <div className="bg-red-50 border border-red-200 p-2.5 rounded-xl text-xs text-red-800">
-                    <div className="font-bold">Bill Cancelled</div>
-                    <div className="text-[11px] text-red-700">Reason: {selectedBill.cancelReason}</div>
-                    {selectedBill.cancelledBy && <div className="text-[10px] text-slate-500">By: {selectedBill.cancelledBy}</div>}
+                  <div className="bg-red-50 border border-red-200 p-2.5 rounded-xl text-xs text-red-800 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-red-900">
+                      <Ban className="w-3.5 h-3.5 text-red-600" />
+                      <span>Cancelled Bill (Excluded from Total Net Sales)</span>
+                    </div>
+                    {selectedBill.cancelReason && (
+                      <div className="text-[11px] text-red-700">Reason: {selectedBill.cancelReason}</div>
+                    )}
+                    {selectedBill.cancelledBy && (
+                      <div className="text-[10px] text-slate-500">Cancelled by: {selectedBill.cancelledBy}</div>
+                    )}
+                  </div>
+                )}
+
+                {isBillSuperseded(selectedBill, bills) && selectedBill.status !== 'CANCELLED' && (
+                  <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-xs text-amber-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Superseded by Re-bill #{getReplacementBill(selectedBill, bills)?.billNumber || 'replacement'}</span>
+                    </div>
+                    <div className="text-[11px] text-amber-700">
+                      This bill has been replaced and its amount is excluded from Daily Net Sales.
+                    </div>
+                  </div>
+                )}
+
+                {(selectedBill.isRebill || selectedBill.originalBillId || selectedBill.replacesBillNumber) && (
+                  <div className="bg-purple-50 border border-purple-200 p-2.5 rounded-xl text-xs text-purple-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-purple-800">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Valid Replacement Re-bill</span>
+                    </div>
+                    <div className="text-[11px] text-purple-700">
+                      Replaces original Bill #{selectedBill.replacesBillNumber || 'original'}. Counted as the active sale.
+                    </div>
                   </div>
                 )}
 
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                  <table className="w-full text-xs text-left font-mono">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 text-[10px]">
-                        <th className="pb-1.5">Item</th>
-                        <th className="pb-1.5 text-center">Qty</th>
-                        <th className="pb-1.5 text-right">Price</th>
-                        <th className="pb-1.5 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedBillItems.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="py-2 text-slate-800 font-sans font-medium">{item.itemName}</td>
-                          <td className="py-2 text-center text-slate-700 font-bold">{item.quantity}</td>
-                          <td className="py-2 text-right text-slate-500">₹{item.unitPrice}</td>
-                          <td className="py-2 text-right font-bold text-slate-900">₹{item.totalPrice}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Calculation Totals Box */}
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs font-mono">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span>₹{selectedBill.subtotal}</span>
-                  </div>
-                  {selectedBill.discount > 0 && (
-                    <div className="flex justify-between text-red-600 font-bold">
-                      <span>Discount:</span>
-                      <span>-₹{selectedBill.discount}</span>
+                  {loadingItems ? (
+                    <div className="py-6 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs">Loading order items...</span>
+                    </div>
+                  ) : selectedBillItems.length === 0 ? (
+                    <div className="py-6 text-center text-slate-400 text-xs">
+                      No item rows found for this order.
+                    </div>
+                  ) : (
+                    <div className="w-full overflow-x-auto scrollbar-thin">
+                      <table className="w-full min-w-[360px] text-xs text-left font-mono border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-500 text-[10px]">
+                            <th className="pb-1.5 pr-2 min-w-[140px] whitespace-nowrap">Item</th>
+                            <th className="pb-1.5 px-2 w-16 min-w-[55px] text-center whitespace-nowrap">Qty</th>
+                            <th className="pb-1.5 px-2 w-20 min-w-[75px] text-right whitespace-nowrap">Price</th>
+                            <th className="pb-1.5 pl-2 w-24 min-w-[85px] text-right whitespace-nowrap">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedBillItems.map((item, idx) => {
+                            const qty = Number(item.quantity) || 0;
+                            const price = Number(item.unitPrice) || 0;
+                            const lineTotal = item.totalPrice !== undefined && !isNaN(Number(item.totalPrice))
+                              ? Number(item.totalPrice)
+                              : qty * price;
+                            return (
+                              <tr key={idx}>
+                                <td className="py-2 pr-2 text-slate-800 font-sans font-medium whitespace-nowrap">{item.itemName}</td>
+                                <td className="py-2 px-2 text-center text-slate-700 font-bold whitespace-nowrap">{qty}</td>
+                                <td className="py-2 px-2 text-right text-slate-500 whitespace-nowrap">₹{price.toFixed(2)}</td>
+                                <td className="py-2 pl-2 text-right font-bold text-slate-900 whitespace-nowrap">₹{lineTotal.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   )}
-                  <div className="border-t border-slate-200 pt-1.5 flex justify-between text-sm font-bold text-slate-900">
-                    <span>Grand Total:</span>
-                    <span className="text-emerald-700 font-extrabold text-base">₹{selectedBill.grandTotal}</span>
-                  </div>
                 </div>
+
+                {/* Calculation Totals Box (Reconciled with items sum and bill calculation) */}
+                {(() => {
+                  const itemsSum = selectedBillItems.reduce((acc, itm) => {
+                    const q = Number(itm.quantity) || 0;
+                    const p = Number(itm.unitPrice) || 0;
+                    const t = itm.totalPrice !== undefined && !isNaN(Number(itm.totalPrice)) ? Number(itm.totalPrice) : q * p;
+                    return acc + t;
+                  }, 0);
+
+                  const rawSubtotal = Number(selectedBill.subtotal);
+                  const effectiveSubtotal = (!isNaN(rawSubtotal) && rawSubtotal > 0)
+                    ? rawSubtotal
+                    : (itemsSum > 0 ? itemsSum : Number(selectedBill.grandTotal || 0));
+
+                  const effectiveDiscount = Number(selectedBill.discount || 0);
+                  const rawGrandTotal = Number(selectedBill.grandTotal);
+                  const effectiveGrandTotal = (!isNaN(rawGrandTotal) && rawGrandTotal > 0)
+                    ? rawGrandTotal
+                    : Math.max(0, effectiveSubtotal - effectiveDiscount);
+
+                  return (
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Subtotal:</span>
+                        <span>₹{effectiveSubtotal.toFixed(2)}</span>
+                      </div>
+                      {effectiveDiscount > 0 && (
+                        <div className="flex justify-between text-red-600 font-bold">
+                          <span>Discount:</span>
+                          <span>-₹{effectiveDiscount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-slate-200 pt-1.5 flex justify-between text-sm font-bold text-slate-900">
+                        <span>Grand Total:</span>
+                        <span className="text-emerald-700 font-extrabold text-base">₹{effectiveGrandTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Action Buttons: Reprint & Cancel */}
@@ -729,7 +942,7 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
                   type="button"
                   onClick={() => handleDirectReprint(selectedBill)}
                   disabled={loadingItems || reprinting}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors disabled:opacity-50"
                   title="Directly send duplicate bill to default thermal printer"
                 >
                   <Printer className="w-4 h-4" />
@@ -817,6 +1030,54 @@ export const BillHistoryReprint: React.FC<BillHistoryReprintProps> = ({ settings
           printButtonText="Confirm & Print Reprint"
           isPrinting={reprinting}
         />
+      )}
+
+      {/* Erase All Bills Confirmation Modal */}
+      {eraseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-2.5 bg-red-100 rounded-xl shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">Erase All Bills in Software?</h3>
+                <p className="text-[11px] text-red-600 font-semibold">Destructive Action • Irreversible</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50/80 border border-red-200 rounded-xl p-3.5 text-xs text-red-900 space-y-2">
+              <p className="font-medium">
+                This will permanently delete all completed bills and bill items from both cloud database and local storage.
+              </p>
+              <ul className="list-disc pl-4 text-[11px] space-y-1 text-red-800">
+                <li>All past orders and bill histories will be wiped.</li>
+                <li>The bill numbering sequence will reset back to <strong>#01</strong>.</li>
+                <li>Menu items, prices, categories, and settings will remain untouched.</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={erasing}
+                onClick={() => setEraseModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEraseAllBills}
+                disabled={erasing}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Trash2 className={`w-3.5 h-3.5 ${erasing ? 'animate-spin' : ''}`} />
+                <span>{erasing ? 'Erasing All Bills...' : 'Yes, Erase All Bills'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

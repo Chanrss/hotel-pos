@@ -853,20 +853,20 @@ export const InventoryManagement: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-100 text-slate-800 p-2 sm:p-4 gap-3 sm:gap-4 overflow-y-auto pb-24 md:pb-8 font-sans">
+    <div className="flex flex-col min-h-full bg-[#F8FAFC] text-slate-800 p-2 sm:p-4 gap-3 sm:gap-4 overflow-y-auto pb-24 md:pb-8 font-sans">
       
       {/* 1. TOP HEADER BAR */}
-      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 sm:py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 sm:py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-sm shrink-0">
-            <Boxes className="w-5 h-5 text-white stroke-[2.5]" />
+          <div className="w-10 h-10 rounded-xl bg-[#0F172A] flex items-center justify-center text-emerald-400 shadow-xs shrink-0">
+            <Boxes className="w-5 h-5 text-emerald-400 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-black text-sm sm:text-base tracking-tight text-slate-900 uppercase leading-none">
+              <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 uppercase leading-none">
                 Count-Based Inventory
               </h1>
-              <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
                 Live POS Tally
               </span>
             </div>
@@ -881,10 +881,10 @@ export const InventoryManagement: React.FC = () => {
           <button
             type="button"
             onClick={() => handleOpenBulkModal('TEMPLATE')}
-            className="px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 shadow-2xs transition-colors cursor-pointer"
+            className="px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 shadow-2xs transition-colors cursor-pointer"
             title="Upload an Excel spreadsheet template to adjust stock levels for multiple items at once"
           >
-            <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
             <span>Upload Stock Template</span>
           </button>
 
@@ -893,12 +893,12 @@ export const InventoryManagement: React.FC = () => {
             onClick={() => handleOpenBulkModal('PRICE')}
             className={`px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-all cursor-pointer ${
               selectedItemIds.length > 0
-                ? 'bg-amber-500 text-slate-950 border-amber-500 font-black shadow-sm ring-2 ring-amber-400/40'
+                ? 'bg-emerald-600 text-white border-emerald-600 font-black shadow-sm'
                 : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200 shadow-2xs'
             }`}
             title="Bulk update item prices or stock levels using checkbox selection"
           >
-            <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+            <SlidersHorizontal className="w-4 h-4 text-emerald-600" />
             <span>Bulk Update {selectedItemIds.length > 0 ? `(${selectedItemIds.length})` : ''}</span>
           </button>
 
@@ -908,9 +908,9 @@ export const InventoryManagement: React.FC = () => {
               setNewItemCategory(selectedCategoryName || 'Ice Cream');
               setNewItemModalOpen(true);
             }}
-            className="px-3 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+            className="px-3 py-1.5 sm:py-2 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
           >
-            <Plus className="w-4 h-4 text-amber-400" />
+            <Plus className="w-4 h-4 text-emerald-400" />
             <span>Add Countable Item</span>
           </button>
 
@@ -919,12 +919,12 @@ export const InventoryManagement: React.FC = () => {
             onClick={() => setShowStockChart((v) => !v)}
             className={`px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-colors cursor-pointer ${
               showStockChart
-                ? 'bg-amber-500/15 text-amber-900 border-amber-300 font-black shadow-2xs'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-black shadow-2xs'
                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
             }`}
             title="Toggle Stock Level vs Minimum Threshold Bar Chart"
           >
-            <BarChart3 className="w-4 h-4 text-amber-600" />
+            <BarChart3 className="w-4 h-4 text-emerald-600" />
             <span>{showStockChart ? 'Hide Stock Chart' : 'Stock Chart'}</span>
           </button>
 
@@ -933,7 +933,7 @@ export const InventoryManagement: React.FC = () => {
             onClick={() => setActiveTab(activeTab === 'count-inventory' ? 'movements' : 'count-inventory')}
             className={`px-3 py-1.5 sm:py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 border transition-colors cursor-pointer ${
               activeTab === 'movements'
-                ? 'bg-amber-500 text-slate-950 border-amber-500 font-black shadow-xs'
+                ? 'bg-[#0F172A] text-white border-[#0F172A] font-black shadow-xs'
                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
             }`}
           >
@@ -1452,11 +1452,11 @@ export const InventoryManagement: React.FC = () => {
               ) : (
                 /* 2. COMPACT TABLE VIEW */
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-500 uppercase tracking-wider">
+                  <div className="w-full overflow-x-auto scrollbar-thin">
+                    <table className="w-full min-w-[780px] text-left text-xs border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-500 uppercase tracking-wider">
                         <tr>
-                          <th className="py-3 px-3 w-10 text-center">
+                          <th className="py-3 px-3 w-12 min-w-[44px] text-center whitespace-nowrap">
                             <div 
                               onClick={handleSelectAllVisible}
                               className="w-4 h-4 rounded border-2 border-slate-300 hover:border-amber-500 bg-white mx-auto cursor-pointer flex items-center justify-center"
@@ -1465,13 +1465,13 @@ export const InventoryManagement: React.FC = () => {
                               {selectedItemIds.length > 0 && <Check className="w-3 h-3 text-amber-600 stroke-[3]" />}
                             </div>
                           </th>
-                          <th className="py-3 px-3">Item Details</th>
-                          <th className="py-3 px-3 text-center">Non-AC Price</th>
-                          <th className="py-3 px-3 text-center">AC Price</th>
-                          <th className="py-3 px-3 text-center">Remaining Stock</th>
-                          <th className="py-3 px-3 text-center">Min Stock</th>
-                          <th className="py-3 px-3 text-center">Status</th>
-                          <th className="py-3 px-3 text-right">Actions</th>
+                          <th className="py-3 px-3 min-w-[200px] whitespace-nowrap">Item Details</th>
+                          <th className="py-3 px-3 w-28 min-w-[100px] text-center whitespace-nowrap">Non-AC Price</th>
+                          <th className="py-3 px-3 w-28 min-w-[90px] text-center whitespace-nowrap">AC Price</th>
+                          <th className="py-3 px-3 w-36 min-w-[125px] text-center whitespace-nowrap">Remaining Stock</th>
+                          <th className="py-3 px-3 w-28 min-w-[95px] text-center whitespace-nowrap">Min Stock</th>
+                          <th className="py-3 px-3 w-28 min-w-[95px] text-center whitespace-nowrap">Status</th>
+                          <th className="py-3 px-3 w-24 min-w-[85px] text-right whitespace-nowrap">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
@@ -2092,17 +2092,17 @@ export const InventoryManagement: React.FC = () => {
             <span className="text-xs font-bold text-slate-600">{movements.length} total entries</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+          <div className="w-full overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[760px] text-xs text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-slate-100/70 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
                 <tr>
-                  <th className="py-2.5 px-3">Date & Time</th>
-                  <th className="py-2.5 px-3">Item Code</th>
-                  <th className="py-2.5 px-3">Item Name</th>
-                  <th className="py-2.5 px-3">Movement Type</th>
-                  <th className="py-2.5 px-3 text-right">Quantity</th>
-                  <th className="py-2.5 px-3">Reference / Notes</th>
-                  <th className="py-2.5 px-3 text-right">Staff</th>
+                  <th className="py-2.5 px-3 w-36 min-w-[130px] whitespace-nowrap">Date & Time</th>
+                  <th className="py-2.5 px-3 w-28 min-w-[95px] whitespace-nowrap">Item Code</th>
+                  <th className="py-2.5 px-3 min-w-[160px] whitespace-nowrap">Item Name</th>
+                  <th className="py-2.5 px-3 w-32 min-w-[115px] whitespace-nowrap">Movement Type</th>
+                  <th className="py-2.5 px-3 w-28 min-w-[95px] text-right whitespace-nowrap">Quantity</th>
+                  <th className="py-2.5 px-3 min-w-[180px] whitespace-nowrap">Reference / Notes</th>
+                  <th className="py-2.5 px-3 w-28 min-w-[90px] text-right whitespace-nowrap">Staff</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

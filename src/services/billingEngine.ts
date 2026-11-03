@@ -139,6 +139,9 @@ export class BillingEngine {
     userId: string;
     userName: string;
     businessDayStart?: string;
+    originalBillId?: string;
+    replacesBillNumber?: string;
+    isRebill?: boolean;
   }): Promise<{ bill: Bill; items: BillItem[] }> {
     const { 
       orderType, 
@@ -149,7 +152,10 @@ export class BillingEngine {
       tableNumber, 
       userId, 
       userName,
-      businessDayStart = '04:00'
+      businessDayStart = '04:00',
+      originalBillId,
+      replacesBillNumber,
+      isRebill
     } = params;
 
     if (!items || items.length === 0) {
@@ -181,6 +187,9 @@ export class BillingEngine {
       reprintCount: 0,
       deviceId,
       transactionId,
+      originalBillId,
+      replacesBillNumber,
+      isRebill: Boolean(isRebill || originalBillId),
       createdAt: now,
       updatedAt: now
     };
@@ -302,14 +311,23 @@ export class BillingEngine {
   /**
    * Cancels a bill without physically deleting it from Firestore.
    */
-  static async cancelBill(billId: string, reason: string, cancelledBy: string): Promise<void> {
-    const cancelData = {
+  static async cancelBill(
+    billId: string, 
+    reason: string, 
+    cancelledBy: string,
+    replacementBillId?: string
+  ): Promise<void> {
+    const cancelData: Partial<Bill> = {
       status: 'CANCELLED' as const,
       cancelReason: reason || 'Cancelled by staff',
       cancelledBy,
       cancelledAt: Date.now(),
       updatedAt: Date.now()
     };
+
+    if (replacementBillId) {
+      cancelData.replacementBillId = replacementBillId;
+    }
 
     // 1. Update in local storage
     const updatedLocally = updateLocalBill(billId, cancelData);

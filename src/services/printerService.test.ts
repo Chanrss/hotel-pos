@@ -93,7 +93,7 @@ describe('PrinterService thermal receipt formatting', () => {
     expect(html).toContain('*** DUPLICATE / REPRINT (2) ***');
   });
 
-  it('generates printable KOT slip with table, items, and quantities', () => {
+  it('generates ultra-compact 3-inch KOT slip with KOT number at top and only QTY & ITEM columns', () => {
     const kot: Kot = {
       id: 'kot-1',
       kotNumber: 'KOT-05',
@@ -126,12 +126,15 @@ describe('PrinterService thermal receipt formatting', () => {
     ];
 
     const kotHtml = PrinterService.generateKotSlipHTML(kot, kotItems);
-    expect(kotHtml).toContain('KITCHEN ORDER TICKET');
-    expect(kotHtml).toContain('KOT-05');
-    expect(kotHtml).toContain('Table: T-2');
-    expect(kotHtml).toContain('Ghee Roast Dosa');
-    expect(kotHtml).toContain('× 2');
-    expect(kotHtml).toContain('Note: Extra crispy');
+    expect(kotHtml).toContain('KOT: KOT-05');
+    expect(kotHtml).toContain('<th class="col-qty">QTY</th>');
+    expect(kotHtml).toContain('<th class="col-item">ITEM</th>');
+    expect(kotHtml).toContain('<td class="col-qty">2</td>');
+    expect(kotHtml).toContain('<td class="col-item">Ghee Roast Dosa</td>');
+    expect(kotHtml).toContain('------------------------');
+    expect(kotHtml).not.toContain('80');
+    expect(kotHtml).not.toContain('Table:');
+    expect(kotHtml).not.toContain('Waiter:');
   });
 
   it('supports toggling mock dev print mode', () => {

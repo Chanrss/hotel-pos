@@ -191,7 +191,19 @@ export function clearLocalBills(): void {
     localStorage.removeItem(LOCAL_BILLS_KEY);
     localStorage.removeItem(LOCAL_ITEMS_KEY);
     localStorage.removeItem('pos_last_printed_bill');
-    window.dispatchEvent(new CustomEvent('pos_bills_updated', { detail: { cleared: true } }));
+
+    // Remove pending sync bill queues and sequence counters
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(PENDING_SYNC_KEY_PREFIX) || k.startsWith('pos_last_bill_'))) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    window.dispatchEvent(new CustomEvent('pos_bills_updated', { detail: { cleared: true, bills: [] } }));
+    window.dispatchEvent(new CustomEvent('pos_bills_erased'));
   } catch (err) {
     console.warn('Error clearing local bills:', err);
   }

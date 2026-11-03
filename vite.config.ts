@@ -11,9 +11,13 @@ export default defineConfig(() => {
       globals: true,
     },
     resolve: {
+      dedupe: ['react', 'react-dom'],
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react-dom/client', 'recharts'],
     },
     build: {
       chunkSizeWarningLimit: 1200,

@@ -169,4 +169,56 @@ describe('ReportEngine (Sales Analytics & Business Intelligence)', () => {
       'daily_sales_august_28.xlsx'
     );
   });
+
+  it('generates automatic DD-MM-YYYY backup filenames with hyphens (SSB_DD-MM-YYYY.pdf & .xlsx)', () => {
+    expect(ReportEngine.formatDateDDMMYYYY('2026-11-02')).toBe('02-11-2026');
+    expect(ReportEngine.getDailyBackupFileName('2026-11-02', 'pdf')).toBe('SSB_02-11-2026.pdf');
+    expect(ReportEngine.getDailyBackupFileName('2026-11-02', 'xlsx')).toBe('SSB_02-11-2026.xlsx');
+    expect(ReportEngine.getDailyBackupFileName('2026-11-02', 'pdf')).not.toContain('/');
+  });
+
+  it('generates Daily Sales Backup Report excluding cancelled bills and removing Item Code from rows', async () => {
+    const backup = await ReportEngine.generateDailySalesBackupReport('2026-08-28');
+
+    expect(backup.formattedDate).toBe('28-08-2026');
+    expect(backup.pdfFileName).toBe('SSB_28-08-2026.pdf');
+    expect(backup.excelFileName).toBe('SSB_28-08-2026.xlsx');
+    // 2 completed bills (b1 and b2); b3 is CANCELLED and must be excluded
+    expect(backup.totalBills).toBe(2);
+    // 3 total items sold (1 Masala Dosa + 1 Filter Coffee in b1, 1 Masala Dosa in b2)
+    expect(backup.totalItemsSold).toBe(3);
+    // Total daily sales = 70 + 30 + 50 = 150
+    expect(backup.totalDailySales).toBe(150);
+    expect(backup.rows.length).toBe(3);
+
+    // Verify exact row structure and that itemCode is not present on DailySalesBackupRow
+    backup.rows.forEach((row, index) => {
+      expect(row.sno).toBe(index + 1);
+      expect(row.date).toBe('28-08-2026');
+      expect(row.itemName).toBeTruthy();
+      expect((row as any).itemCode).toBeUndefined();
+    });
+  });
+
+  it('exports Daily Sales Backup Excel workbook with matching totals and no Item Code column', async () => {
+    const backup = await ReportEngine.generateDailySalesBackupReport('2026-08-28');
+    const fileName = ReportEngine.exportDailySalesBackupExcel(backup);
+
+    expect(fileName).toBe('SSB_28-08-2026.xlsx');
+    expect(XLSX.writeFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'SSB_28-08-2026.xlsx'
+    );
+
+    const wb = vi.mocked(XLSX.writeFile).mock.calls.at(-1)?.[0] as XLSX.WorkBook;
+    expect(wb).toBeDefined();
+    expect(wb.SheetNames).toContain('Daily Sales Report');
+    expect(wb.SheetNames).toContain('Daily Summary');
+
+    const ws = wb.Sheets['Daily Sales Report'];
+    const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 });
+    const headerRow = rows.find((r) => Array.isArray(r) && r.includes('S.No') && r.includes('Bill No'));
+    expect(headerRow).toEqual(['S.No', 'Bill No', 'Date', 'Time', 'Item Name', 'Quantity', 'Unit Price', 'Total']);
+    expect(headerRow).not.toContain('Item Code');
+  });
 });

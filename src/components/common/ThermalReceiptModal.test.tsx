@@ -9,7 +9,9 @@ vi.mock('../../services/printerService', () => ({
   PrinterService: {
     printBill: vi.fn(),
     setPrintRootLogoSize: vi.fn(),
-    getPrintRootLogoSize: vi.fn(() => ({ width: 140, height: 50 }))
+    getPrintRootLogoSize: vi.fn(() => ({ width: 140, height: 50 })),
+    generateThermalReceiptHTML: vi.fn(() => '<html><body>Receipt</body></html>'),
+    downloadPrintableReceiptFile: vi.fn()
   }
 }));
 

@@ -10,6 +10,7 @@ import {
   getLatestGeneratedBackup,
   triggerBlobDownload
 } from '../services/backupService';
+import { checkAndRunScheduledDailySalesBackup } from '../services/autoDailyBackupService';
 import { getBusinessDate } from '../services/billNumberEngine';
 
 export interface UseAutomatedDailyBackupReturn {
@@ -80,22 +81,31 @@ export function useAutomatedDailyBackup(settings?: RestaurantSettings): UseAutom
     return unsubscribe;
   }, [refreshHistory]);
 
-  // Automated background schedule check
+  // Automated background schedule check (runs JSON archive + Automatic Daily Sales PDF & Excel Backup in Asia/Kolkata)
   useEffect(() => {
     if (!config.enabled) return;
 
-    // Initial check after 5 seconds of startup
+    const runScheduledChecks = async () => {
+      try {
+        await checkAndExecuteAutomatedDailyBackup(settingsRef.current);
+      } catch (err) {
+        console.warn('Automated JSON backup check error:', err);
+      }
+      try {
+        await checkAndRunScheduledDailySalesBackup(settingsRef.current);
+      } catch (err) {
+        console.warn('Automatic Daily Sales PDF/Excel backup check error:', err);
+      }
+    };
+
+    // Initial check after 4 seconds of startup
     const initialTimer = setTimeout(() => {
-      checkAndExecuteAutomatedDailyBackup(settingsRef.current).catch((err) => {
-        console.warn('Initial automated backup check error:', err);
-      });
-    }, 5000);
+      runScheduledChecks();
+    }, 4000);
 
     // Periodic check every 45 seconds
     const interval = setInterval(() => {
-      checkAndExecuteAutomatedDailyBackup(settingsRef.current).catch((err) => {
-        console.warn('Periodic automated backup check error:', err);
-      });
+      runScheduledChecks();
     }, 45000);
 
     return () => {

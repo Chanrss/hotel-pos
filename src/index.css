@@ -1,25 +1,186 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
 
-/* Dedicated Restaurant POS Terminal Theme: Clean, Compact & High-Contrast */
+/* Dedicated Enterprise Restaurant POS Terminal Theme System */
 @theme {
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans Tamil', 'Mukta Malar', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --spacing: 0.25rem;
-  --text-2xs: 0.78rem;
+  --text-2xs: 0.76rem;
   --text-2xs--line-height: 1.1rem;
-  --text-xs: 0.85rem;
+  --text-xs: 0.84rem;
   --text-xs--line-height: 1.25rem;
-  --text-sm: 0.95rem;
+  --text-sm: 0.94rem;
   --text-sm--line-height: 1.35rem;
-  --text-base: 1.05rem;
+  --text-base: 1.02rem;
   --text-base--line-height: 1.45rem;
-  --text-lg: 1.18rem;
+  --text-lg: 1.15rem;
   --text-lg--line-height: 1.6rem;
-  --text-xl: 1.32rem;
+  --text-xl: 1.3rem;
   --text-xl--line-height: 1.75rem;
-  --text-2xl: 1.55rem;
+  --text-2xl: 1.52rem;
   --text-2xl--line-height: 1.95rem;
-  --text-3xl: 1.85rem;
+  --text-3xl: 1.82rem;
   --text-3xl--line-height: 2.25rem;
+}
+
+/* Default Palette (Original Pre-Redesign): Classic Dark Slate & Warm Amber Gold */
+:root,
+:root[data-pos-theme="slate-amber"] {
+  --pos-shell-bg: #0f172a;
+  --pos-shell-secondary: #1e293b;
+  --pos-accent-primary: #d97706;
+  --pos-accent-warm: #f59e0b;
+  --pos-canvas-bg: #f8fafc;
+  --color-emerald-50: #fffbeb;
+  --color-emerald-100: #fef3c7;
+  --color-emerald-200: #fde68a;
+  --color-emerald-300: #fcd34d;
+  --color-emerald-400: #fbbf24;
+  --color-emerald-500: #f59e0b;
+  --color-emerald-600: #d97706;
+  --color-emerald-700: #b45309;
+  --color-emerald-800: #92400e;
+  --color-emerald-900: #78350f;
+  --color-emerald-950: #451a03;
+}
+
+/* Palette 2: Enterprise Navy, Crisp White & Emerald Green */
+:root[data-pos-theme="navy-emerald"] {
+  --pos-shell-bg: #0f172a;
+  --pos-shell-secondary: #1e293b;
+  --pos-accent-primary: #059669;
+  --pos-accent-warm: #d97706;
+  --pos-canvas-bg: #f8fafc;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+}
+
+/* Palette 3: Royal Indigo, Warm Pearl & Vibrant Indigo-Saffron */
+:root[data-pos-theme="royal-indigo"] {
+  --pos-shell-bg: #1e1b4b;
+  --pos-shell-secondary: #2e2968;
+  --pos-accent-primary: #4f46e5;
+  --pos-accent-warm: #d97706;
+  --pos-canvas-bg: #f5f5fa;
+  --color-emerald-50: #eef2ff;
+  --color-emerald-100: #e0e7ff;
+  --color-emerald-200: #c7d2fe;
+  --color-emerald-300: #a5b4fc;
+  --color-emerald-400: #818cf8;
+  --color-emerald-500: #6366f1;
+  --color-emerald-600: #4f46e5;
+  --color-emerald-700: #4338ca;
+  --color-emerald-800: #3730a3;
+  --color-emerald-900: #312e81;
+  --color-emerald-950: #1e1b4b;
+}
+
+/* Palette 3: Saravana Heritage Green & Temple Gold */
+:root[data-pos-theme="heritage-green"] {
+  --pos-shell-bg: #064e3b;
+  --pos-shell-secondary: #065f46;
+  --pos-accent-primary: #059669;
+  --pos-accent-warm: #d97706;
+  --pos-canvas-bg: #f6f8f4;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+}
+
+/* Palette 3: Ocean Teal & Warm Coral */
+:root[data-pos-theme="ocean-teal"] {
+  --pos-shell-bg: #134e4a;
+  --pos-shell-secondary: #115e59;
+  --pos-accent-primary: #0d9488;
+  --pos-accent-warm: #ea580c;
+  --pos-canvas-bg: #f2f7f7;
+  --color-emerald-50: #f0fdfa;
+  --color-emerald-100: #ccfbf1;
+  --color-emerald-200: #99f6e4;
+  --color-emerald-300: #5eead4;
+  --color-emerald-400: #2dd4bf;
+  --color-emerald-500: #14b8a6;
+  --color-emerald-600: #0d9488;
+  --color-emerald-700: #0f766e;
+  --color-emerald-800: #115e59;
+  --color-emerald-900: #134e4a;
+  --color-emerald-950: #042f2e;
+}
+
+/* Palette 4: Rosewood Burgundy & Warm Cream */
+:root[data-pos-theme="rosewood-burgundy"] {
+  --pos-shell-bg: #4c0519;
+  --pos-shell-secondary: #6b0f28;
+  --pos-accent-primary: #e11d48;
+  --pos-accent-warm: #d97706;
+  --pos-canvas-bg: #faf6f5;
+  --color-emerald-50: #fff1f2;
+  --color-emerald-100: #ffe4e6;
+  --color-emerald-200: #fecdd3;
+  --color-emerald-300: #fda4af;
+  --color-emerald-400: #fb7185;
+  --color-emerald-500: #f43f5e;
+  --color-emerald-600: #e11d48;
+  --color-emerald-700: #be123c;
+  --color-emerald-800: #9f1239;
+  --color-emerald-900: #881337;
+  --color-emerald-950: #4c0519;
+}
+
+/* Palette 5: Obsidian Charcoal & Electric Cobalt */
+:root[data-pos-theme="obsidian-cobalt"] {
+  --pos-shell-bg: #18181b;
+  --pos-shell-secondary: #27272a;
+  --pos-accent-primary: #2563eb;
+  --pos-accent-warm: #059669;
+  --pos-canvas-bg: #f8fafc;
+  --color-emerald-50: #eff6ff;
+  --color-emerald-100: #dbeafe;
+  --color-emerald-200: #bfdbfe;
+  --color-emerald-300: #93c5fd;
+  --color-emerald-400: #60a5fa;
+  --color-emerald-500: #3b82f6;
+  --color-emerald-600: #2563eb;
+  --color-emerald-700: #1d4ed8;
+  --color-emerald-800: #1e40af;
+  --color-emerald-900: #1e3a8a;
+  --color-emerald-950: #172554;
+}
+
+@media screen {
+  #root .bg-\[\#0F172A\] {
+    background-color: var(--pos-shell-bg) !important;
+  }
+  #root .bg-\[\#1E293B\] {
+    background-color: var(--pos-shell-secondary) !important;
+  }
+  #root .bg-\[\#F8FAFC\] {
+    background-color: var(--pos-canvas-bg) !important;
+  }
+  #root .border-\[\#0F172A\] {
+    border-color: var(--pos-shell-bg) !important;
+  }
+  #root .text-\[\#0F172A\] {
+    color: var(--pos-shell-bg) !important;
+  }
 }
 
 /* HTML & Body root responsive and smooth touch scrolling */
@@ -29,14 +190,15 @@ html, body {
   width: 100%;
   margin: 0;
   padding: 0;
+  font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 1.42;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   overflow-x: hidden;
-  background-color: #f1f5f9;
+  background-color: var(--pos-canvas-bg, #f5f5fa);
   color: #0f172a;
 }
 
@@ -48,7 +210,7 @@ html, body {
   }
   body {
     font-size: 1rem !important;
-    line-height: 1.42 !important;
+    line-height: 1.45 !important;
     width: 100% !important;
     height: 100% !important;
   }
@@ -89,8 +251,9 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  font-family: var(--font-sans);
   font-size: 1rem;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 /* Touch friendly interaction & compact padding for POS terminal controls (scoped to #root) */
@@ -102,16 +265,55 @@ html, body {
   letter-spacing: 0.005em;
 }
 
+/* Hide scrollbars where requested */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Consistent overflow-x-auto wrapper pattern & layout stability for POS data tables */
+.table-scroll-wrapper,
+.data-table-wrapper,
+.items-table-wrapper,
+#root .overflow-x-auto,
+#root div:has(> table:not(.items-table):not(.meta-table):not(.totals-table)) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  box-sizing: border-box;
+}
+
+#root table,
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
 #root table th,
-#root table td {
-  padding-top: 0.45rem;
-  padding-bottom: 0.45rem;
+#root table td,
+.data-table th,
+.data-table td {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+#root table thead th,
+.data-table thead th {
+  white-space: nowrap;
 }
 
 /* Custom scrollbars for high-density POS terminals */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -121,7 +323,7 @@ html, body {
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.65);
+  background: rgba(71, 85, 105, 0.7);
 }
 
 /* 1. Default (Screen): Ensure #pos-print-root is strictly hidden and isolated from screen font/padding scaling */
@@ -131,7 +333,7 @@ html, body {
   max-width: 72mm !important;
   font-size: var(--receipt-base-font-size, 12px) !important;
   line-height: 1.25 !important;
-  padding: 2px 2px 4px 2px !important;
+  padding: var(--receipt-margin-top, 2mm) var(--receipt-margin-right, 2mm) var(--receipt-margin-bottom, 4mm) var(--receipt-margin-left, 2mm) !important;
   margin: 0 auto !important;
   box-sizing: border-box !important;
   zoom: 1 !important;
@@ -202,7 +404,7 @@ body.pos-printing {
     width: 72mm !important;
     max-width: 72mm !important;
     margin: 0 auto !important;
-    padding: 2px 2px 4px 2px !important;
+    padding: var(--receipt-margin-top, 2mm) var(--receipt-margin-right, 2mm) var(--receipt-margin-bottom, 4mm) var(--receipt-margin-left, 2mm) !important;
     box-sizing: border-box !important;
     background: white !important;
     color: black !important;
@@ -235,6 +437,22 @@ body.pos-printing {
   #pos-print-root table td {
     padding-top: 2px;
     padding-bottom: 2px;
+  }
+
+  /* Ultra-compact 3-inch KOT slip print rules inside #pos-print-root */
+  body #pos-print-root:has(.kot-compact-slip) {
+    padding: 0.5mm 1mm 0mm 1mm !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.05 !important;
+  }
+
+  #pos-print-root .kot-items-table th,
+  #pos-print-root .kot-items-table td {
+    padding-top: 0.5px !important;
+    padding-bottom: 0.5px !important;
+    line-height: 1.05 !important;
   }
 
   .receipt-wrapper {
@@ -399,9 +617,12 @@ body.pos-printing {
   .divider-double { border-top: 3px double #000; margin: 4px 0; }
   .divider-dashed { border-top: 1px dashed #000; margin: 4px 0; }
   .meta-table, .items-table, .totals-table { 
-    width: 100%; 
-    border-collapse: collapse; 
+    width: 100% !important; 
+    border-collapse: collapse !important; 
     font-size: var(--receipt-base-font-size, 12px); 
+  }
+  .items-table {
+    table-layout: fixed !important;
   }
   .meta-table td { 
     padding: 1.5px 0; 
@@ -412,10 +633,117 @@ body.pos-printing {
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000; 
     padding: 3px 0; 
-    text-align: left; 
     font-weight: 800;
     font-size: var(--receipt-meta-font-size, 10.5px);
+    vertical-align: middle;
   }
+  .items-table td {
+    padding: 2px 0;
+    vertical-align: top;
+    line-height: 1.2;
+  }
+
+  /* 4-column layout (Item, Qty, Price, Total): Item name in full without dots */
+  .items-table th:first-child:nth-last-child(4),
+  .items-table td:first-child:nth-last-child(4) {
+    width: 48% !important;
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    padding-right: 2px;
+  }
+  .items-table td:first-child:nth-last-child(4) > div {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .items-table th:nth-child(2):nth-last-child(3),
+  .items-table td:nth-child(2):nth-last-child(3) {
+    width: 14% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 4px;
+    vertical-align: top !important;
+  }
+  .items-table th:nth-child(3):nth-last-child(2),
+  .items-table td:nth-child(3):nth-last-child(2) {
+    width: 18% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 4px;
+    vertical-align: top !important;
+  }
+  .items-table th:nth-child(4):nth-last-child(1),
+  .items-table td:nth-child(4):nth-last-child(1) {
+    width: 20% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 8px !important;
+    vertical-align: top !important;
+  }
+
+  /* 5-column layout (#, Item, Qty, Price, Total): Item name in full without dots */
+  .items-table th:first-child:nth-last-child(5),
+  .items-table td:first-child:nth-last-child(5) {
+    width: 8% !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    vertical-align: top !important;
+  }
+  .items-table th:nth-child(2):nth-last-child(4),
+  .items-table td:nth-child(2):nth-last-child(4) {
+    width: 44% !important;
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    padding-right: 2px;
+  }
+  .items-table td:nth-child(2):nth-last-child(4) > div {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .items-table th:nth-child(3):nth-last-child(3),
+  .items-table td:nth-child(3):nth-last-child(3) {
+    width: 14% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 4px;
+    vertical-align: top !important;
+  }
+  .items-table th:nth-child(4):nth-last-child(2),
+  .items-table td:nth-child(4):nth-last-child(2) {
+    width: 16% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 4px;
+    vertical-align: top !important;
+  }
+  .items-table th:nth-child(5):nth-last-child(1),
+  .items-table td:nth-child(5):nth-last-child(1) {
+    width: 18% !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums;
+    padding-right: 8px !important;
+    vertical-align: top !important;
+  }
+
   .totals-table td { padding: 1.5px 0; }
   .grand-total-row { 
     font-size: var(--receipt-total-font-size, 15px);
@@ -604,6 +932,199 @@ body.pos-printing {
   line-height: 0.96 !important;
   margin: 0 !important;
   padding: 0 !important;
+}
+
+/* ========================================================================= */
+/* THERMAL RECEIPT ITEMS TABLE: UNIVERSAL ALIGNMENT & WRAP-RESISTANT TOTAL */
+/* Applies to Screen Preview Modals, Settings Live Roll, and Print Output   */
+/* ========================================================================= */
+.items-table-wrapper,
+.receipt-items-wrapper,
+#thermal-receipt-preview,
+div:has(> .items-table) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  box-sizing: border-box;
+}
+
+.items-table,
+#pos-print-root table,
+#thermal-receipt-preview table,
+#live-receipt-paper table {
+  width: 100% !important;
+  max-width: 100%;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.items-table th,
+.items-table td,
+#pos-print-root table th,
+#pos-print-root table td,
+#thermal-receipt-preview table th,
+#thermal-receipt-preview table td,
+#live-receipt-paper table th,
+#live-receipt-paper table td {
+  box-sizing: border-box;
+}
+
+/* 4-column layout (Item, Qty, Price, Total): Item on same line, no wrapping */
+.items-table th:first-child:nth-last-child(4),
+.items-table td:first-child:nth-last-child(4),
+#pos-print-root table th:first-child:nth-last-child(4),
+#pos-print-root table td:first-child:nth-last-child(4),
+#thermal-receipt-preview table th:first-child:nth-last-child(4),
+#thermal-receipt-preview table td:first-child:nth-last-child(4),
+#live-receipt-paper table th:first-child:nth-last-child(4),
+#live-receipt-paper table td:first-child:nth-last-child(4) {
+  width: 48% !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  padding-right: 2px;
+}
+
+.items-table td:first-child:nth-last-child(4) > div,
+#pos-print-root table td:first-child:nth-last-child(4) > div,
+#thermal-receipt-preview table td:first-child:nth-last-child(4) > div,
+#live-receipt-paper table td:first-child:nth-last-child(4) > div {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.items-table th:nth-child(2):nth-last-child(3),
+.items-table td:nth-child(2):nth-last-child(3),
+#pos-print-root table th:nth-child(2):nth-last-child(3),
+#pos-print-root table td:nth-child(2):nth-last-child(3),
+#thermal-receipt-preview table th:nth-child(2):nth-last-child(3),
+#thermal-receipt-preview table td:nth-child(2):nth-last-child(3),
+#live-receipt-paper table th:nth-child(2):nth-last-child(3),
+#live-receipt-paper table td:nth-child(2):nth-last-child(3) {
+  width: 14% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
+.items-table th:nth-child(3):nth-last-child(2),
+.items-table td:nth-child(3):nth-last-child(2),
+#pos-print-root table th:nth-child(3):nth-last-child(2),
+#pos-print-root table td:nth-child(3):nth-last-child(2),
+#thermal-receipt-preview table th:nth-child(3):nth-last-child(2),
+#thermal-receipt-preview table td:nth-child(3):nth-last-child(2),
+#live-receipt-paper table th:nth-child(3):nth-last-child(2),
+#live-receipt-paper table td:nth-child(3):nth-last-child(2) {
+  width: 18% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
+.items-table th:nth-child(4):nth-last-child(1),
+.items-table td:nth-child(4):nth-last-child(1),
+#pos-print-root table th:nth-child(4):nth-last-child(1),
+#pos-print-root table td:nth-child(4):nth-last-child(1),
+#thermal-receipt-preview table th:nth-child(4):nth-last-child(1),
+#thermal-receipt-preview table td:nth-child(4):nth-last-child(1),
+#live-receipt-paper table th:nth-child(4):nth-last-child(1),
+#live-receipt-paper table td:nth-child(4):nth-last-child(1) {
+  width: 20% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 8px !important;
+}
+
+/* 5-column layout (#, Item, Qty, Price, Total): Item on same line, no wrapping */
+.items-table th:first-child:nth-last-child(5),
+.items-table td:first-child:nth-last-child(5),
+#pos-print-root table th:first-child:nth-last-child(5),
+#pos-print-root table td:first-child:nth-last-child(5),
+#thermal-receipt-preview table th:first-child:nth-last-child(5),
+#thermal-receipt-preview table td:first-child:nth-last-child(5),
+#live-receipt-paper table th:first-child:nth-last-child(5),
+#live-receipt-paper table td:first-child:nth-last-child(5) {
+  width: 8% !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+.items-table th:nth-child(2):nth-last-child(4),
+.items-table td:nth-child(2):nth-last-child(4),
+#pos-print-root table th:nth-child(2):nth-last-child(4),
+#pos-print-root table td:nth-child(2):nth-last-child(4),
+#thermal-receipt-preview table th:nth-child(2):nth-last-child(4),
+#thermal-receipt-preview table td:nth-child(2):nth-last-child(4),
+#live-receipt-paper table th:nth-child(2):nth-last-child(4),
+#live-receipt-paper table td:nth-child(2):nth-last-child(4) {
+  width: 44% !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  padding-right: 2px;
+}
+
+.items-table td:nth-child(2):nth-last-child(4) > div,
+#pos-print-root table td:nth-child(2):nth-last-child(4) > div,
+#thermal-receipt-preview table td:nth-child(2):nth-last-child(4) > div,
+#live-receipt-paper table td:nth-child(2):nth-last-child(4) > div {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.items-table th:nth-child(3):nth-last-child(3),
+.items-table td:nth-child(3):nth-last-child(3),
+#pos-print-root table th:nth-child(3):nth-last-child(3),
+#pos-print-root table td:nth-child(3):nth-last-child(3),
+#thermal-receipt-preview table th:nth-child(3):nth-last-child(3),
+#thermal-receipt-preview table td:nth-child(3):nth-last-child(3),
+#live-receipt-paper table th:nth-child(3):nth-last-child(3),
+#live-receipt-paper table td:nth-child(3):nth-last-child(3) {
+  width: 14% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
+.items-table th:nth-child(4):nth-last-child(2),
+.items-table td:nth-child(4):nth-last-child(2),
+#pos-print-root table th:nth-child(4):nth-last-child(2),
+#pos-print-root table td:nth-child(4):nth-last-child(2),
+#thermal-receipt-preview table th:nth-child(4):nth-last-child(2),
+#thermal-receipt-preview table td:nth-child(4):nth-last-child(2),
+#live-receipt-paper table th:nth-child(4):nth-last-child(2),
+#live-receipt-paper table td:nth-child(4):nth-last-child(2) {
+  width: 16% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
+.items-table th:nth-child(5):nth-last-child(1),
+.items-table td:nth-child(5):nth-last-child(1),
+#pos-print-root table th:nth-child(5):nth-last-child(1),
+#pos-print-root table td:nth-child(5):nth-last-child(1),
+#thermal-receipt-preview table th:nth-child(5):nth-last-child(1),
+#thermal-receipt-preview table td:nth-child(5):nth-last-child(1),
+#live-receipt-paper table th:nth-child(5):nth-last-child(1),
+#live-receipt-paper table td:nth-child(5):nth-last-child(1) {
+  width: 18% !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  padding-right: 8px !important;
 }
 
 /* Responsive KOT Display Grid for Mobile Devices & Kitchen Displays */

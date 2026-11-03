@@ -136,3 +136,32 @@ export async function allocateNextKotNumber(businessDate: string): Promise<{ kot
     numericValue: nextNumber
   };
 }
+
+/**
+ * Resets the daily bill numbering sequence back to 0.
+ * If businessDate is provided, resets that date; otherwise resets all dates.
+ */
+export function resetBillSequence(businessDate?: string): void {
+  if (businessDate) {
+    if (sequenceCache[businessDate]) {
+      sequenceCache[businessDate].lastBill = 0;
+    }
+    try {
+      localStorage.removeItem(`pos_last_bill_${businessDate}`);
+    } catch (_) {}
+  } else {
+    for (const key of Object.keys(sequenceCache)) {
+      sequenceCache[key].lastBill = 0;
+    }
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('pos_last_bill_')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (_) {}
+  }
+}

@@ -614,7 +614,6 @@ export async function exportDailyBillingExcelBackup(
       'Bill Status',
       'Business Date',
       'Bill Time',
-      'Item Code',
       'Item Name (English)',
       'Item Name (Tamil)',
       'Category',
@@ -651,7 +650,6 @@ export async function exportDailyBillingExcelBackup(
         item.billStatus,
         item.businessDate,
         formatReadableTime(item.createdAt),
-        item.itemCode,
         item.itemName,
         item.itemNameTamil || '',
         item.category || '',
@@ -678,7 +676,6 @@ export async function exportDailyBillingExcelBackup(
       '',
       '',
       '',
-      '',
       sumItemQty,
       '',
       toCurrencyNum(sumItemSubtotal),
@@ -697,7 +694,6 @@ export async function exportDailyBillingExcelBackup(
       { wch: 12 }, // Status
       { wch: 14 }, // Date
       { wch: 12 }, // Time
-      { wch: 12 }, // Item Code
       { wch: 24 }, // Name English
       { wch: 20 }, // Name Tamil
       { wch: 16 }, // Category
@@ -714,7 +710,7 @@ export async function exportDailyBillingExcelBackup(
       { wch: 14 }  // Status
     ];
     if (itemRows.length > 2) {
-      wsItems['!autofilter'] = { ref: `A1:S${itemRows.length - 1}` };
+      wsItems['!autofilter'] = { ref: `A1:R${itemRows.length - 1}` };
     }
     XLSX.utils.book_append_sheet(workbook, wsItems, 'Sold Items');
 

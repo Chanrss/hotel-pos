@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Printer, IndianRupee, FileText, CheckCircle2 } from 'lucide-react';
 import { Bill, BillItem, RestaurantSettings } from '../../types';
 import { saveDailyBackupRecord } from '../../services/backupService';
+import { calculateDailyNetSales } from '../../services/salesCalculationEngine';
 
 interface DailyPrintSummaryModalProps {
   isOpen: boolean;
@@ -29,9 +30,11 @@ export const DailyPrintSummaryModal: React.FC<DailyPrintSummaryModalProps> = ({
   const address = settings?.address || '12, South Car Street, Chidambaram, Tamil Nadu - 608001';
   const phone = settings?.phone || '+91 94432 10987';
 
-  // Metrics
-  const completedBills = bills.filter((b) => b.businessDate === businessDate && b.status === 'COMPLETED');
-  const cancelledBills = bills.filter((b) => b.businessDate === businessDate && b.status === 'CANCELLED');
+  // Metrics (deduplicated, excluding cancelled and superseded bills)
+  const dayBills = bills.filter((b) => b.businessDate === businessDate);
+  const salesBreakdown = calculateDailyNetSales(dayBills);
+  const completedBills = salesBreakdown.validBills;
+  const cancelledBills = dayBills.filter((b) => b.status === 'CANCELLED');
 
   let totalGross = 0;
   let totalDiscount = 0;

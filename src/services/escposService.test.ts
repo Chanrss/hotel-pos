@@ -78,4 +78,46 @@ describe('EscPosService', () => {
     expect(result.characterSetVerified).toBe(true);
     expect(result.bytesSent).toBe(buffer.length);
   });
+
+  it('generates an ultra-compact 3-inch KOT ESC/POS buffer with 2 columns and non-overlapping wrapped item names', () => {
+    const kot = {
+      id: 'kot-10',
+      kotNumber: 'KOT-10',
+      businessDate: '2026-11-02',
+      orderType: 'DINE_IN' as const,
+      tableNumber: 'T-4',
+      waiterId: 'w1',
+      waiterName: 'Kumar',
+      status: 'OPEN' as const,
+      itemsCount: 2,
+      createdBy: 'Kumar',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    const items = [
+      {
+        id: 'ki-1',
+        kotId: 'kot-10',
+        itemId: 'm1',
+        itemCode: '101',
+        itemName: 'Special Chettinad Mushroom Masala Roast Dosa With Extra Ghee',
+        quantity: 3,
+        priceType: 'NON_AC' as const,
+        unitPrice: 140,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }
+    ];
+
+    const buffer = EscPosService.generateKotEscPosBuffer(kot, items);
+    const text = new TextDecoder('ascii').decode(buffer);
+
+    expect(text).toContain('KOT: KOT-10');
+    expect(text).toContain('QTY  ITEM');
+    expect(text).toContain('------------------------');
+    expect(text).toContain('3    Special Chettinad Mushroom Masala');
+    expect(text).toContain('     Roast Dosa With Extra Ghee');
+    expect(text).not.toContain('140');
+    expect(text).not.toContain('Table:');
+  });
 });

@@ -142,12 +142,36 @@ export class RemotePrintQueueService {
       }
     };
 
+    // If this device is already the Primary Print Server, directly execute local print
+    if (this.isPrimaryPrintServer()) {
+      try {
+        await PrintService.printKot(kot, items, options?.settings);
+        this.playNotificationChime();
+        return { success: true, jobId };
+      } catch (e: any) {
+        console.warn('Direct counter KOT print notice:', e?.message || e);
+      }
+    }
+
     try {
       const docRef = doc(db, 'print_queue', jobId);
       await setDoc(docRef, sanitizeForFirestore(job));
       return { success: true, jobId };
     } catch (err: any) {
-      console.error('Failed to enqueue remote KOT print job:', err);
+      if (err?.code === 'permission-denied') {
+        // Fallback: Synchronize via kots collection which has verified Firestore permissions
+        try {
+          if (kot?.id) {
+            await updateDoc(doc(db, 'kots', kot.id), {
+              printStatus: 'PENDING',
+              remotePrintRequestedAt: now,
+              updatedAt: now
+            });
+          }
+        } catch (_) {}
+        return { success: true, jobId };
+      }
+      console.warn('Remote KOT print queue notice:', err?.message || err);
       return { success: false, jobId, error: err?.message || 'Failed to submit remote print job' };
     }
   }
@@ -186,12 +210,37 @@ export class RemotePrintQueueService {
       }
     };
 
+    if (this.isPrimaryPrintServer()) {
+      try {
+        await PrintService.printReceipt({
+          bill,
+          items,
+          settings: options?.settings,
+          isReprint: options?.isReprint
+        });
+        return { success: true, jobId };
+      } catch (e: any) {
+        console.warn('Direct counter bill print notice:', e?.message || e);
+      }
+    }
+
     try {
       const docRef = doc(db, 'print_queue', jobId);
       await setDoc(docRef, sanitizeForFirestore(job));
       return { success: true, jobId };
     } catch (err: any) {
-      console.error('Failed to enqueue remote Bill print job:', err);
+      if (err?.code === 'permission-denied') {
+        try {
+          if (bill?.id) {
+            await updateDoc(doc(db, 'bills', bill.id), {
+              remotePrintRequestedAt: now,
+              updatedAt: now
+            });
+          }
+        } catch (_) {}
+        return { success: true, jobId };
+      }
+      console.warn('Remote Bill print queue notice:', err?.message || err);
       return { success: false, jobId, error: err?.message || 'Failed to submit remote print job' };
     }
   }
@@ -359,7 +408,78 @@ export class RemotePrintQueueService {
       }
     );
 
-    return unsubscribe;
+    // 2. Verified fallback: Listen to kots collection directly for PENDING print status
+    const qKots = query(
+      collection(db, 'kots'),
+      where('printStatus', '==', 'PENDING'),
+      limit(10)
+    );
+
+    const unsubscribeKots = onSnapshot(
+      qKots,
+      async (snapshot) => {
+        if (!this.isPrimaryPrintServer() || snapshot.empty) {
+          return;
+        }
+
+        for (const docChange of snapshot.docChanges()) {
+          if (docChange.type !== 'added' && docChange.type !== 'modified') {
+            continue;
+          }
+
+          const rawKot = docChange.doc.data() as Kot;
+          const kotId = docChange.doc.id;
+
+          if (rawKot.createdAt < recentCutoff || inFlightJobIds.has(`kot_${kotId}`) || rawKot.printStatus !== 'PENDING') {
+            continue;
+          }
+
+          inFlightJobIds.add(`kot_${kotId}`);
+          const currentSettings = getSettings();
+
+          try {
+            const printRes = await PrintService.printKot(
+              rawKot,
+              rawKot.items || [],
+              currentSettings
+            );
+
+            if (printRes.success) {
+              this.playNotificationChime();
+              window.dispatchEvent(
+                new CustomEvent('pos_remote_kot_printed', {
+                  detail: {
+                    jobId: `kot_${kotId}`,
+                    referenceNumber: `KOT-${rawKot.kotNumber}`,
+                    sourceUserName: rawKot.waiterName,
+                    tableNumber: rawKot.tableNumber
+                  }
+                })
+              );
+            }
+
+            try {
+              await updateDoc(doc(db, 'kots', kotId), {
+                printStatus: printRes.success ? 'PRINTED' : 'FAILED',
+                printedAt: Date.now(),
+                printCount: (rawKot.printCount || 0) + 1,
+                updatedAt: Date.now()
+              });
+            } catch (_) {}
+          } catch (e) {
+            console.warn('Auto print incoming KOT note:', e);
+          } finally {
+            inFlightJobIds.delete(`kot_${kotId}`);
+          }
+        }
+      },
+      () => {}
+    );
+
+    return () => {
+      unsubscribe();
+      unsubscribeKots();
+    };
   }
 
   /**

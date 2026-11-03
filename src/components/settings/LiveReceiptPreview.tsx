@@ -9,10 +9,12 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
-  Crosshair
+  Crosshair,
+  Download
 } from 'lucide-react';
 import { RestaurantSettings } from '../../types';
 import { DEFAULT_RESTAURANT_LOGO } from '../../data/defaultLogo';
+import { PrinterService } from '../../services/printerService';
 
 export interface LiveReceiptPreviewProps {
   settings: RestaurantSettings;
@@ -27,8 +29,10 @@ export interface LiveReceiptPreviewProps {
 }
 
 const PREVIEW_ITEMS = [
-  { id: '1', name: 'மசால் தோசை', qty: 2, price: 80, total: 160 },
-  { id: '2', name: 'ஃபில்டர் காபி', qty: 1, price: 30, total: 30 }
+  { id: '1', name: 'பனீர் டிக்கா', qty: 1, price: 240, total: 240 },
+  { id: '2', name: 'வெஜ் பிரியாணி', qty: 2, price: 180, total: 360 },
+  { id: '3', name: 'கோக் (500ml)', qty: 2, price: 60, total: 120 },
+  { id: '4', name: 'குடிநீர் பாட்டில்', qty: 1, price: 30, total: 30 }
 ];
 
 export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
@@ -92,7 +96,7 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
   const watermarkOpacity = settings.watermarkOpacity !== undefined ? Number(settings.watermarkOpacity) : 0.12;
   const watermarkSize = Math.max(90, Math.min(200, Number(settings.receiptLogoMaxWidth || 155)));
 
-  const rawAddress = settings.address || 'No:8A, Rajambal Nagar, Salem Main Rd, Anna Nagar, Kallakurichi-606213';
+  const rawAddress = settings.address || 'No: 8A, Rajambal Nagar, Salem Main Road,\nAnna Nagar, Kallakurichi - 606202';
   const formatAddressLines = (addr: string): string[] => {
     if (!addr) return [];
     if (addr.includes('\n')) return addr.split('\n').map(s => s.trim()).filter(Boolean);
@@ -249,12 +253,14 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
           id="live-receipt-paper"
           style={{
             fontSize: `${baseFontSize}px`,
-            lineHeight: isCompact ? 1.12 : 1.24
+            lineHeight: isCompact ? 1.12 : 1.24,
+            paddingTop: `${settings.receiptMarginTop ?? (isCompact ? 2 : 3)}mm`,
+            paddingBottom: `${settings.receiptMarginBottom ?? (isCompact ? 3 : 5)}mm`,
+            paddingLeft: `${settings.receiptMarginLeft ?? (isCompact ? 2 : 2.5)}mm`,
+            paddingRight: `${settings.receiptMarginRight ?? (isCompact ? 2 : 2.5)}mm`
           }}
           className={`relative bg-white text-black ${
             is58mm ? 'w-[235px]' : 'w-[296px]'
-          } ${
-            isCompact ? 'px-2.5 py-2' : 'px-3 py-3'
           } shadow-2xl border border-slate-300 font-mono select-none overflow-hidden transition-all ${
             isCompact ? 'compact-mode receipt-compact' : ''
           }`}
@@ -299,31 +305,32 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
           )}
 
           {/* Receipt Foreground Content Layer */}
-          <div className="relative z-10 pointer-events-none">
+          <div className="relative z-10 pointer-events-none" style={{ boxSizing: 'border-box' }}>
             {/* 1. Shop Name, Compact Address, Phone */}
-            <div className={isCompact ? 'mb-0.5' : 'mb-1'}>
+            <div className={isCompact ? 'mb-0.5' : 'mb-1'} style={{ boxSizing: 'border-box' }}>
               <div
                 style={{
-                  fontSize: `${titleFontSize}px`,
+                  fontSize: '20px',
                   textAlign: shopNameAlign,
                   fontWeight: boldRestaurantName ? 800 : 400
                 }}
-                className="restaurant-title text-black leading-[1.12] font-sans mb-[1px]"
+                className="restaurant-title text-black leading-[1.2] font-sans mb-[1px]"
               >
-                {settings.restaurantNameTamil || settings.restaurantName || 'ஸ்ரீ சரவண பவன்'}
+                {settings.restaurantNameTamil || 'ஸ்ரீ சரவணபவன்'}
               </div>
 
               {showAddress && (
                 <div
                   style={{
                     textAlign: addressAlign,
-                    lineHeight: '0.96',
-                    marginBottom: '0px'
+                    lineHeight: '1.15',
+                    marginBottom: '0px',
+                    fontSize: '12px'
                   }}
                   className="restaurant-address address-section text-black mb-0"
                 >
                   {addressLines.map((line, idx) => (
-                    <div key={idx} className="leading-[0.96] m-0 p-0">
+                    <div key={idx} className="leading-[1.15] m-0 p-0">
                       {line}
                     </div>
                   ))}
@@ -334,152 +341,79 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
                 <div
                   style={{
                     textAlign: phoneAlign,
-                    lineHeight: '1.02'
+                    lineHeight: '1.15',
+                    fontSize: '12px'
                   }}
-                  className="phone-section text-black mt-[1px] mb-0"
+                  className="phone-section text-black mt-[1px] mb-0 font-semibold"
                 >
-                  PH: {settings.phone || '7708159933'}
+                  {settings.phone ? (settings.phone.toLowerCase().startsWith('ph') ? settings.phone : `Ph: ${settings.phone}`) : 'Ph: 9976974098, 7810066035'}
                 </div>
               )}
             </div>
 
-            {/* 2. Bill Header Meta (Single-line Bill No + Time & Single-line Order + Captain) */}
+            {/* 2. Bill Information (Row 1: Bill No & Date, Row 2: Captain No & Time) */}
             <div
-              style={{ textAlign: billHeaderAlign }}
-              className={`${
-                isCompact ? 'py-1 my-0.5' : 'py-1.5 my-1'
-              } border-y border-dashed border-black space-y-0.5`}
+              className="py-1 my-1 border-t border-b border-dashed border-black space-y-0.5 text-[13px]"
+              style={{ lineHeight: 1.25, boxSizing: 'border-box' }}
             >
-              <div
-                className={`flex items-center ${
-                  billHeaderAlign === 'center'
-                    ? 'justify-center gap-4'
-                    : billHeaderAlign === 'right'
-                    ? 'justify-end gap-4'
-                    : 'justify-between'
-                }`}
-                style={{ fontWeight: boldBillNumber ? 800 : 400 }}
-              >
-                <span>Bill No: 015</span>
-                <span>Time: {formattedTime}</span>
+              <div className="flex items-center justify-between font-bold">
+                <span>Bill No : 01</span>
+                <span>Date : 31/10/2026</span>
               </div>
-              <div
-                className={`flex items-center ${
-                  billHeaderAlign === 'center'
-                    ? 'justify-center gap-4'
-                    : billHeaderAlign === 'right'
-                    ? 'justify-end gap-4'
-                    : 'justify-between'
-                }`}
-              >
-                <span>Order: Dine-In</span>
-                <span>Captain: 01</span>
+              <div className="flex items-center justify-between">
+                <span>Captain No : 01</span>
+                <span>Time : {formattedTime}</span>
               </div>
             </div>
 
-            {/* 3. Items Table (Tamil Item Names) */}
-            <table className="w-full my-1 border-collapse table-fixed">
+            {/* 3. Items Table (ITEM (38%) | QTY (14%) | RATE (21%) | AMOUNT (27%)) */}
+            <table className="w-full my-1 border-collapse table-fixed text-[13px]" style={{ tableLayout: 'fixed', boxSizing: 'border-box' }}>
               <thead>
-                <tr
-                  style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                  className="border-b border-dashed border-black text-black"
-                >
-                  {showItemSl && (
-                    <th
-                      style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                      className={`${isCompact ? 'py-0.5' : 'py-1'} text-left w-[10%]`}
-                    >
-                      #
-                    </th>
-                  )}
-                  <th
-                    style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                    className={`${isCompact ? 'py-0.5' : 'py-1'} text-left ${
-                      showItemSl ? 'w-[40%]' : 'w-[46%]'
-                    }`}
-                  >
-                    பொருள்
-                  </th>
-                  <th
-                    style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                    className={`${isCompact ? 'py-0.5' : 'py-1'} text-right w-[14%]`}
-                  >
-                    Qty
-                  </th>
-                  <th
-                    style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                    className={`${isCompact ? 'py-0.5' : 'py-1'} text-right w-[18%]`}
-                  >
-                    Price
-                  </th>
-                  <th
-                    style={{ fontWeight: boldItemHeader ? 800 : 400 }}
-                    className={`${isCompact ? 'py-0.5' : 'py-1'} text-right w-[18%]`}
-                  >
-                    Total
-                  </th>
+                <tr className="border-b border-dashed border-black text-black font-extrabold text-[13px]">
+                  <th className="py-1 text-left pr-1 w-[38%] whitespace-nowrap">ITEM</th>
+                  <th className="py-1 text-right pr-1.5 w-[14%] whitespace-nowrap">QTY</th>
+                  <th className="py-1 text-right pr-2 w-[21%] whitespace-nowrap">RATE</th>
+                  <th className="py-1 text-right pr-2 w-[27%] whitespace-nowrap">AMOUNT</th>
                 </tr>
               </thead>
               <tbody>
-                {PREVIEW_ITEMS.map((item, idx) => (
-                  <tr key={item.id} className="align-top">
-                    {showItemSl && (
-                      <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left font-mono text-black font-semibold text-[13px]`}>
-                        {idx + 1}
-                      </td>
-                    )}
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-left pr-1 break-words`}>
-                      <div className="font-black font-sans text-black text-[16px] sm:text-[17px] leading-tight">{item.name}</div>
+                {PREVIEW_ITEMS.map((item) => (
+                  <tr key={item.id} className="align-top" style={{ boxSizing: 'border-box' }}>
+                    <td className="py-0.5 text-left pr-1 break-words">
+                      <div className="font-bold font-sans text-black leading-tight text-[14px] break-words" title={item.name}>{item.name}</div>
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-black text-black text-[16px] sm:text-[17px]`}>
-                      <b>{item.qty}</b>
+                    <td className="py-0.5 text-right pr-1.5 font-mono font-bold text-black whitespace-nowrap text-[13px] align-top">
+                      {item.qty}
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-bold text-black text-[15px] sm:text-[16px]`}>
+                    <td className="py-0.5 text-right pr-2 font-mono text-black whitespace-nowrap text-[13px] align-top">
                       {item.price}
                     </td>
-                    <td className={`${isCompact ? 'py-0.5' : 'py-1'} text-right font-mono font-black text-black text-[16px] sm:text-[17px]`}>
-                      {item.total}
+                    <td className="py-0.5 text-right pr-2 font-mono font-bold text-black whitespace-nowrap text-[13px] align-top">
+                      {Number(item.total).toFixed(2)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            {/* Optional Net Qty & Subtotal Summary Row */}
-            {showTotalQty && (
-              <div className="border-t border-dashed border-black pt-1 mt-0.5 flex justify-between items-center text-[0.9em] text-black">
-                <span>
-                  Total Qty: <b>{totalQty}</b>
-                </span>
-                <span>
-                  Subtotal: <b>₹{grandTotal}</b>
-                </span>
+            {/* 4. Bill Total (மொத்தம் subtotal & GRAND TOTAL) */}
+            <div className="border-t border-dashed border-black pt-1 mt-1 space-y-1" style={{ boxSizing: 'border-box' }}>
+              <div className="flex justify-between items-center text-[14px] text-black">
+                <span className="font-bold">மொத்தம்</span>
+                <span className="font-mono font-bold pr-2">{Number(grandTotal).toFixed(2)}</span>
               </div>
-            )}
-
-            {/* 4. Grand Total */}
-            <div className={`${isCompact ? 'py-1 my-0.5' : 'py-1.5 my-1'} border-y border-dashed border-black`}>
-              <div
-                style={{
-                  fontSize: `${totalFontSize}px`,
-                  fontWeight: boldGrandTotal ? 900 : 400
-                }}
-                className="flex justify-between items-center text-black"
-              >
-                <span>Grand Total:</span>
-                <span>₹{grandTotal}</span>
+              {/* 5. Grand Total (Centered Single-Line Group) */}
+              <div className="flex justify-center items-center gap-3.5 text-black border-t border-dashed border-black pt-1.5 mt-1 text-[17px] font-black text-center">
+                <span className="tracking-wide">GRAND TOTAL</span>
+                <span className="font-mono tracking-normal">{Number(grandTotal).toFixed(2)}</span>
               </div>
             </div>
 
             {/* 5. Footer */}
             <div
-              style={{
-                textAlign: footerAlign,
-                fontWeight: boldFooter ? 700 : 400
-              }}
-              className={`${isCompact ? 'mt-1.5' : 'mt-2'} pt-0.5 text-black uppercase tracking-wide`}
+              className="mt-2 text-center text-black font-black font-sans text-[16px] tracking-wide"
             >
-              {settings.receiptFooter || 'THANK YOU'}
+              நன்றி! மீண்டும் வருக!
             </div>
           </div>
         </div>
@@ -538,6 +472,66 @@ export const LiveReceiptPreview: React.FC<LiveReceiptPreviewProps> = ({
               </div>
             </div>
           )}
+
+          {/* Direct Physical Printer Test Option via Downloadable Auto-Print HTML */}
+          <button
+            type="button"
+            id="btn-download-sample-receipt-html"
+            onClick={() => {
+              const now = Date.now();
+              const testBill: any = {
+                id: 'test-receipt-001',
+                billNumber: 'TEST-001',
+                businessDate: new Date(now).toISOString().split('T')[0],
+                orderType: 'DINE_IN',
+                priceType: 'NON_AC',
+                tableNumber: 'T-01',
+                subtotal: 190,
+                discount: 0,
+                grandTotal: 190,
+                paymentMethod: 'CASH',
+                paymentStatus: 'PAID',
+                status: 'COMPLETED',
+                createdAt: now,
+                reprintCount: 0
+              };
+              const testItems: any = [
+                {
+                  id: 'test-item-1',
+                  billId: 'test-receipt-001',
+                  itemId: 'sample-1',
+                  itemCode: '101',
+                  itemName: 'Masala Dosa',
+                  itemNameTamil: 'மசால் தோசை',
+                  quantity: 2,
+                  unitPrice: 80,
+                  totalPrice: 160,
+                  priceType: 'NON_AC',
+                  createdAt: now
+                },
+                {
+                  id: 'test-item-2',
+                  billId: 'test-receipt-001',
+                  itemId: 'sample-2',
+                  itemCode: '102',
+                  itemName: 'Filter Coffee',
+                  itemNameTamil: 'ஃபில்டர் காபி',
+                  quantity: 1,
+                  unitPrice: 30,
+                  totalPrice: 30,
+                  priceType: 'NON_AC',
+                  createdAt: now
+                }
+              ];
+              const html = PrinterService.generateThermalReceiptHTML(testBill, testItems, settings);
+              PrinterService.downloadPrintableReceiptFile(html, 'sample-test-receipt.html');
+            }}
+            className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            title="Download this receipt as an HTML file that triggers direct print to your physical printer"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Download Print File (.html)</span>
+          </button>
         </div>
       )}
     </div>

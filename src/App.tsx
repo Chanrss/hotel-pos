@@ -12,7 +12,7 @@ import { RemotePrintQueueToast } from './components/common/RemotePrintQueueToast
 import { DailyLowStockAlertModal, useDailyLowStockAlert } from './components/inventory/DailyLowStockAlertModal';
 import { useAutomatedDailyBackup } from './hooks/useAutomatedDailyBackup';
 import { RestaurantSettings } from './types';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { DEFAULT_RESTAURANT_LOGO } from './data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from './services/brandLogoService';
@@ -25,12 +25,13 @@ const InventoryManagement = lazy(() => import('./components/inventory/InventoryM
 const UserManagement = lazy(() => import('./components/users/UserManagement').then((m) => ({ default: m.UserManagement })));
 const MenuManagement = lazy(() => import('./components/menu/MenuManagement').then((m) => ({ default: m.MenuManagement })));
 const SettingsView = lazy(() => import('./components/settings/SettingsView').then((m) => ({ default: m.SettingsView })));
+const ReceiptSettingsView = lazy(() => import('./components/settings/ReceiptSettingsView').then((m) => ({ default: m.ReceiptSettingsView })));
 const BillHistoryReprint = lazy(() => import('./components/billing/BillHistoryReprint').then((m) => ({ default: m.BillHistoryReprint })));
 
 const ModuleLoadingFallback: React.FC = () => (
   <div className="flex-1 flex flex-col items-center justify-center min-h-[360px] p-8 text-slate-500" role="status" aria-label="Loading module">
-    <div className="w-9 h-9 border-3 border-amber-600 border-t-transparent rounded-full animate-spin mb-3" />
-    <p className="text-sm font-medium text-slate-700">Loading module...</p>
+    <div className="w-9 h-9 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
+    <p className="text-sm font-semibold text-slate-800">Loading module...</p>
     <p className="text-xs text-slate-400 mt-0.5">Please wait a moment</p>
   </div>
 );
@@ -65,6 +66,31 @@ const AppContent: React.FC = () => {
         if (rawLocal) cachedLocal = JSON.parse(rawLocal);
       } catch (_) {}
 
+      const isCleanedV6 = localStorage.getItem('pos_receipt_clean_v6') === 'true';
+      if (!isCleanedV6) {
+        cachedLocal.receiptShowEnglishName = false;
+        cachedLocal.receiptShowAddress = false;
+        cachedLocal.receiptShowBranchName = false;
+        cachedLocal.receiptShowEmail = false;
+        cachedLocal.receiptShowGstFssai = false;
+        cachedLocal.receiptShowInvoiceTitle = false;
+        cachedLocal.invoiceTitle = '';
+        cachedLocal.receiptHeader = '';
+        cachedLocal.receiptShowHeader = false;
+        cachedLocal.showOrderType = false;
+        cachedLocal.showCaptainCode = false;
+        cachedLocal.receiptShowPaymentMethod = false;
+        cachedLocal.receiptShowQrCode = false;
+        cachedLocal.receiptShowUpiDetails = false;
+        cachedLocal.receiptShowReturnPolicy = false;
+        cachedLocal.receiptShowDiscount = false;
+        cachedLocal.returnPolicy = '';
+        try {
+          localStorage.setItem('pos_receipt_clean_v6', 'true');
+          localStorage.setItem('pos_restaurant_settings', JSON.stringify(cachedLocal));
+        } catch (_) {}
+      }
+
       const merged = { ...cachedLocal, ...(data || {}) };
       const isLogoRemoved = Boolean(merged.logoRemoved);
       const rawStorageUrl = merged.logoStorageUrl?.trim();
@@ -94,7 +120,20 @@ const AppContent: React.FC = () => {
         logoStorageUrl: updatedLogo,
         logoProtectedBrandAsset: !isLogoRemoved,
         monochromeLogoUrl: merged.monochromeLogoUrl || merged.bwLogoUrl || '',
-        receiptHeader: merged.receiptHeader || 'SRI SARAVANA BHAVAN',
+        receiptHeader: merged.receiptHeader || '',
+        receiptShowHeader: Boolean(merged.receiptShowHeader),
+        receiptShowEnglishName: Boolean(merged.receiptShowEnglishName),
+        receiptShowAddress: Boolean(merged.receiptShowAddress),
+        receiptShowBranchName: Boolean(merged.receiptShowBranchName),
+        receiptShowPhone: Boolean(merged.receiptShowPhone),
+        receiptShowEmail: Boolean(merged.receiptShowEmail),
+        receiptShowGstFssai: Boolean(merged.receiptShowGstFssai),
+        receiptShowInvoiceTitle: Boolean(merged.receiptShowInvoiceTitle),
+        receiptShowPaymentMethod: Boolean(merged.receiptShowPaymentMethod),
+        receiptShowQrCode: Boolean(merged.receiptShowQrCode),
+        receiptShowUpiDetails: Boolean(merged.receiptShowUpiDetails),
+        receiptShowReturnPolicy: Boolean(merged.receiptShowReturnPolicy),
+        receiptShowDiscount: Boolean(merged.receiptShowDiscount),
         receiptFooter: merged.receiptFooter || 'THANK YOU',
         businessDayStartHour: merged.businessDayStartHour || '04:00',
         billNumberDigits: merged.billNumberDigits || 2,
@@ -147,10 +186,78 @@ const AppContent: React.FC = () => {
       setSettings(buildSettings());
     });
 
+    const handleNavEvent = (e: Event) => {
+      const custom = e as CustomEvent<NavTab>;
+      if (custom.detail) setActiveTab(custom.detail);
+    };
+    window.addEventListener('pos_navigate_tab', handleNavEvent);
+
     return () => {
       window.removeEventListener('pos-settings-updated', handleLocalSettingsUpdate);
+      window.removeEventListener('pos_navigate_tab', handleNavEvent);
       unsub();
     };
+  }, []);
+
+  // One-time async sync of clean receipt preferences to Firestore
+  useEffect(() => {
+    const isCleanedV6Cloud = localStorage.getItem('pos_receipt_clean_v6_cloud') === 'true';
+    if (!isCleanedV6Cloud) {
+      try {
+        localStorage.setItem('pos_receipt_clean_v6_cloud', 'true');
+        setDoc(doc(db, 'settings', 'restaurant'), {
+          receiptShowEnglishName: false,
+          receiptShowAddress: false,
+          receiptShowBranchName: false,
+          receiptShowEmail: false,
+          receiptShowGstFssai: false,
+          receiptShowInvoiceTitle: false,
+          invoiceTitle: '',
+          receiptHeader: '',
+          receiptShowHeader: false,
+          showOrderType: false,
+          showCaptainCode: false,
+          receiptShowPaymentMethod: false,
+          receiptShowQrCode: false,
+          receiptShowUpiDetails: false,
+          receiptShowReturnPolicy: false,
+          receiptShowDiscount: false,
+          returnPolicy: ''
+        }, { merge: true }).catch((err) => console.warn('Cloud sync notice:', err));
+      } catch (_) {}
+    }
+  }, []);
+
+  // One-time client deployment wipe: purge any local bill caches so customer starts 100% fresh with 0 bills
+  useEffect(() => {
+    const WIPE_FLAG = 'pos_customer_deploy_fresh_wipe_v1';
+    if (localStorage.getItem(WIPE_FLAG) !== 'true') {
+      try {
+        localStorage.removeItem('pos_local_completed_bills');
+        localStorage.removeItem('pos_local_completed_items');
+        localStorage.removeItem('pos_last_printed_bill');
+
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (
+            k &&
+            (k.startsWith('pos_pending_bills_') ||
+              k.startsWith('pos_last_bill_') ||
+              k.startsWith('pos_last_kot_'))
+          ) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+        localStorage.setItem(WIPE_FLAG, 'true');
+
+        window.dispatchEvent(new CustomEvent('pos_bills_erased', { detail: { deployClean: true } }));
+        window.dispatchEvent(new CustomEvent('pos_bills_updated', { detail: { cleared: true, bills: [] } }));
+      } catch (err) {
+        console.warn('Deploy local wipe notice:', err);
+      }
+    }
   }, []);
 
   // Set default starting tab based on role
@@ -263,8 +370,20 @@ const AppContent: React.FC = () => {
               <UserManagement />
             )}
 
+            {activeTab === 'receipt-settings' && (
+              isOwner ? (
+                <ReceiptSettingsView settings={settings} />
+              ) : (
+                <UserManagement />
+              )
+            )}
+
             {activeTab === 'settings' && (
-              <SettingsView settings={settings} />
+              isOwner ? (
+                <SettingsView settings={settings} onNavigateTab={(tab) => setActiveTab(tab)} />
+              ) : (
+                <UserManagement />
+              )
             )}
           </Suspense>
         </main>
