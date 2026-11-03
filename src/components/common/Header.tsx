@@ -264,15 +264,15 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full flex flex-col shrink-0 select-none bg-[#0F172A] text-white border-b border-slate-800 shadow-xs">
       {/* Row 1: Enterprise Navy Status & Operator Bar */}
-      <div className="h-11 px-3 flex items-center justify-between gap-2 w-full bg-[#0F172A] border-b border-slate-800/80">
+      <div className="h-9.5 sm:h-11 px-2 sm:px-3 flex items-center justify-between gap-1.5 sm:gap-2 w-full bg-[#0F172A] border-b border-slate-800/80">
         
         {/* Left: Sidebar Toggle + Preserved Restaurant Logo + Brand Name */}
-        <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 shrink-0">
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="h-8 px-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-100 hover:text-emerald-400 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-100 hover:text-emerald-400 border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               title="Open Navigation Sidebar [☰]"
             >
               <MenuIcon className="w-4 h-4 text-emerald-400" />
@@ -280,9 +280,9 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             {(settings?.logoUrl || DEFAULT_RESTAURANT_LOGO) ? (
-              <div className="w-7 h-7 rounded-lg bg-white border border-emerald-500/80 flex items-center justify-center p-0.5 shrink-0 overflow-hidden shadow-2xs">
+              <div className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg bg-white border border-emerald-500/80 flex items-center justify-center p-0.5 shrink-0 overflow-hidden shadow-2xs">
                 <img
                   src={settings?.logoUrl || DEFAULT_RESTAURANT_LOGO}
                   alt={settings?.restaurantName || 'POS'}
@@ -295,13 +295,13 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </div>
             ) : (
-              <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0">
-                <UtensilsCrossed className="w-4 h-4" />
+              <div className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0">
+                <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             )}
 
             <div className="min-w-0">
-              <span className="font-extrabold text-xs sm:text-sm tracking-tight text-white uppercase truncate block max-w-[150px] sm:max-w-[260px] md:max-w-none">
+              <span className="font-extrabold text-[11px] sm:text-sm tracking-tight text-white uppercase truncate block max-w-[120px] xs:max-w-[155px] sm:max-w-[260px] md:max-w-none">
                 {settings?.restaurantName || 'SRI SARAVANA BHAVAN'}
               </span>
             </div>
@@ -309,15 +309,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right: Active Bill Counter, Clock, Print Server Mode, Operator Role & Lock/Logout */}
-        <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center justify-end gap-1 sm:gap-2 shrink-0">
           
           {/* Current Bill Sequence */}
           <div
             id="header-current-bill-no"
-            className="h-7 px-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center gap-1.5 font-mono text-xs font-bold shrink-0"
+            className="h-6.5 sm:h-7 px-1.5 sm:px-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex items-center gap-1 sm:gap-1.5 font-mono text-[11px] sm:text-xs font-bold shrink-0"
             title={`Active Bill Counter: #${currentBillNo}`}
           >
-            <Receipt className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <Receipt className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
             <span className="hidden xs:inline text-2xs text-emerald-300/90 uppercase">Bill</span>
             <span className="font-extrabold text-white">#{currentBillNo}</span>
           </div>
@@ -334,7 +334,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="h-7 w-7 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/15 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
+            className="hidden sm:flex h-7 w-7 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/15 items-center justify-center cursor-pointer shrink-0 transition-colors"
             title={isFullscreen ? 'Exit Full Screen' : 'Full Screen POS'}
             aria-label={isFullscreen ? 'Exit Full Screen' : 'Full Screen POS'}
           >
@@ -349,7 +349,7 @@ export const Header: React.FC<HeaderProps> = ({
               setIsPrintServer(next);
               RemotePrintQueueService.setPrimaryPrintServer(next);
             }}
-            className={`h-7 px-2.5 rounded-lg font-bold text-2xs flex items-center gap-1.5 cursor-pointer shrink-0 border transition-all ${
+            className={`h-6.5 sm:h-7 px-1.5 sm:px-2.5 rounded-lg font-bold text-2xs flex items-center gap-1 sm:gap-1.5 cursor-pointer shrink-0 border transition-all ${
               isPrintServer
                 ? 'bg-emerald-950/90 hover:bg-emerald-900 border-emerald-500/60 text-emerald-300'
                 : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400'
@@ -362,7 +362,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Radio className={`w-3.5 h-3.5 ${isPrintServer ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
             <span className="hidden sm:inline">{isPrintServer ? 'Print Server ON' : 'Waiter Mode'}</span>
-            <span className="sm:hidden">{isPrintServer ? 'Server' : 'Waiter'}</span>
           </button>
 
           {/* Active Operator Role Badge */}
@@ -391,7 +390,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onOpenAuth}
-            className="h-7 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+            className="h-6.5 sm:h-7 px-1.5 sm:px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-2xs flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
             title="Switch Staff Operator (Username & PIN)"
           >
             <LogIn className="w-3.5 h-3.5 text-emerald-400" />
@@ -404,7 +403,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={logout}
               data-testid="header-logout-btn"
-              className="h-7 px-2.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-100 hover:text-white border border-red-800/80 flex items-center gap-1 font-bold text-2xs justify-center cursor-pointer shrink-0 transition-colors"
+              className="h-6.5 sm:h-7 px-1.5 sm:px-2.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-100 hover:text-white border border-red-800/80 flex items-center gap-1 font-bold text-2xs justify-center cursor-pointer shrink-0 transition-colors"
               title="Lock Terminal & Sign Out"
               aria-label="Sign Out"
             >
@@ -417,7 +416,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Row 2: Quick Horizontal Module Bar */}
-      <div className="relative w-full h-9 bg-[#1E293B] flex items-center select-none shrink-0 border-t border-slate-800/60">
+      <div className="relative w-full h-8 sm:h-9 bg-[#1E293B] flex items-center select-none shrink-0 border-t border-slate-800/60">
         {canScrollLeft && (
           <button
             type="button"
@@ -433,7 +432,7 @@ export const Header: React.FC<HeaderProps> = ({
           ref={navScrollRef}
           onScroll={checkNavScroll}
           aria-label="Main POS Navigation"
-          className="w-full flex items-center gap-1 px-2.5 overflow-x-auto no-scrollbar scroll-smooth"
+          className="w-full flex items-center gap-1 px-2 sm:px-2.5 overflow-x-auto no-scrollbar scroll-smooth"
         >
           {navItems.map((item) => {
             if (!item.show) return null;
@@ -445,13 +444,13 @@ export const Header: React.FC<HeaderProps> = ({
                 data-tab-id={item.id}
                 type="button"
                 onClick={() => onSelectTab && onSelectTab(item.id)}
-                className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                className={`h-6.5 sm:h-7 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 sm:gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'bg-emerald-600 text-white font-extrabold shadow-xs'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+                <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
                 <span>{item.label}</span>
               </button>
             );

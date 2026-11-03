@@ -22,7 +22,8 @@ import {
   Eye,
   Maximize2,
   Sliders,
-  Palette
+  Palette,
+  Laptop
 } from 'lucide-react';
 import { RestaurantSettings } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
@@ -32,6 +33,9 @@ import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from '../../ser
 import { PrintService } from '../../services/PrintService';
 import { LiveReceiptPreview } from './LiveReceiptPreview';
 import { RemotePrintServerCard } from './RemotePrintServerCard';
+import { ConnectedDevicesSubView } from './ConnectedDevicesSubView';
+import { DeviceSessionService } from '../../services/deviceSessionService';
+import { useAuth } from '../../context/AuthContext';
 import { purgeAllBills } from '../../services/billCleanupService';
 import { POS_THEMES, PosThemeId, getSavedPosTheme, applyPosTheme } from '../../services/posThemeService';
 
@@ -259,6 +263,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
       updatedAt: Date.now()
     };
   });
+
+  const { currentUser } = useAuth();
+  const [settingsSubView, setSettingsSubView] = useState<'general' | 'connected-devices'>('general');
+  const [activeDevicesCount, setActiveDevicesCount] = useState<number>(1);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = DeviceSessionService.subscribeToSessions(currentUser, (sessions) => {
+      const sameProfileActive = sessions.filter(
+        (s) =>
+          DeviceSessionService.isSameUserProfile(s, currentUser) &&
+          (DeviceSessionService.getComputedStatus(s) === 'ONLINE' ||
+            DeviceSessionService.getComputedStatus(s) === 'IDLE')
+      );
+      setActiveDevicesCount(Math.max(1, sameProfileActive.length));
+    });
+    return unsub;
+  }, [currentUser]);
 
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -548,50 +570,100 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
   return (
     <div className="flex flex-col h-full bg-[#0F172A] text-slate-100 p-3 sm:p-4 gap-3.5 overflow-y-auto md:overflow-hidden font-sans">
       {/* Top Bar */}
-      <div className="bg-[#1E293B] border border-slate-700/80 px-4 py-3 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400">
-            <Printer className="w-5 h-5" />
+      <div className="bg-[#1E293B] border border-slate-700/80 px-4 py-3 rounded-xl flex flex-col gap-3 shadow-sm shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400">
+              {settingsSubView === 'connected-devices' ? (
+                <Laptop className="w-5 h-5" />
+              ) : (
+                <Printer className="w-5 h-5" />
+              )}
+            </div>
+            <div>
+              <h2 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
+                {settingsSubView === 'connected-devices'
+                  ? 'Connected Devices & Active Sessions'
+                  : 'System, Printer & Receipt Settings'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {settingsSubView === 'connected-devices'
+                  ? 'View and manage active POS terminals, laptops & mobile phones signed into your Firestore user profile'
+                  : 'Restaurant details, 3-inch thermal receipt layout, security auto-lock, backup schedule & AC/Non-AC pricing'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-              System, Printer &amp; Receipt Settings
-            </h2>
-            <p className="text-xs text-slate-400">
-              Restaurant details, 3-inch thermal receipt layout, security auto-lock, backup schedule &amp; AC/Non-AC pricing
-            </p>
-          </div>
+
+          {settingsSubView === 'general' && (
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                type="button"
+                onClick={() => setMobilePreviewPinned((v) => !v)}
+                className="md:hidden px-3 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span>{mobilePreviewPinned ? 'Hide Preview' : 'Pin Preview'}</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-header-test-print"
+                onClick={handleTestPrint}
+                disabled={testPrintStatus.state === 'printing'}
+                className="px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span>{testPrintStatus.state === 'printing' ? 'Printing...' : 'TEST PRINT'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSave()}
+                disabled={saving}
+                className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Save className={`w-4 h-4 ${saving ? 'animate-spin' : ''}`} />
+                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Settings Sub-View Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-700/70">
           <button
             type="button"
-            onClick={() => setMobilePreviewPinned((v) => !v)}
-            className="md:hidden px-3 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center gap-1.5 cursor-pointer"
+            onClick={() => setSettingsSubView('general')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer border ${
+              settingsSubView === 'general'
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
+                : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
+            }`}
           >
-            <Eye className="w-4 h-4 text-emerald-400" />
-            <span>{mobilePreviewPinned ? 'Hide Preview' : 'Pin Preview'}</span>
+            <Printer className="w-4 h-4" />
+            <span>Receipt &amp; System Settings</span>
           </button>
 
           <button
             type="button"
-            id="btn-header-test-print"
-            onClick={handleTestPrint}
-            disabled={testPrintStatus.state === 'printing'}
-            className="px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            onClick={() => setSettingsSubView('connected-devices')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer border ${
+              settingsSubView === 'connected-devices'
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs'
+                : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800'
+            }`}
           >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            <span>{testPrintStatus.state === 'printing' ? 'Printing...' : 'TEST PRINT'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSave()}
-            disabled={saving}
-            className="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
-          >
-            <Save className={`w-4 h-4 ${saving ? 'animate-spin' : ''}`} />
-            <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+            <Laptop className="w-4 h-4" />
+            <span>Connected Devices &amp; Active Sessions</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                settingsSubView === 'connected-devices'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              {activeDevicesCount} Active
+            </span>
           </button>
         </div>
       </div>
@@ -614,30 +686,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
         </div>
       )}
 
-      {/* Optional Mobile Pinned Live Receipt Preview (< 768px) */}
-      {mobilePreviewPinned && (
-        <div className="md:hidden shrink-0">
-          <LiveReceiptPreview
-            settings={formData}
-            onUpdateLogoPosition={(offsetX, offsetY) =>
-              updateSettingsImmediate((prev) => ({
-                ...prev,
-                logoOffsetX: offsetX,
-                logoOffsetY: offsetY
-              }))
-            }
-            onResetLogoPosition={handleResetLogoPosition}
-            onTestPrint={handleTestPrint}
-            isPrintingSample={testPrintStatus.state === 'printing'}
-            testPrintStatus={testPrintStatus}
-          />
-        </div>
-      )}
+      {settingsSubView === 'connected-devices' ? (
+        <ConnectedDevicesSubView />
+      ) : (
+        <>
+          {/* Optional Mobile Pinned Live Receipt Preview (< 768px) */}
+          {mobilePreviewPinned && (
+            <div className="md:hidden shrink-0">
+              <LiveReceiptPreview
+                settings={formData}
+                onUpdateLogoPosition={(offsetX, offsetY) =>
+                  updateSettingsImmediate((prev) => ({
+                    ...prev,
+                    logoOffsetX: offsetX,
+                    logoOffsetY: offsetY
+                  }))
+                }
+                onResetLogoPosition={handleResetLogoPosition}
+                onTestPrint={handleTestPrint}
+                isPrintingSample={testPrintStatus.state === 'printing'}
+                testPrintStatus={testPrintStatus}
+              />
+            </div>
+          )}
 
-      {/* Persistent Split-Pane Workspace: Left Scrollable Controls + Right Persistent Preview Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:flex-1 md:min-h-0 md:overflow-hidden">
-        {/* Left Column: Receipt & Printer Controls (7 cols, independently scrollable) */}
-        <div className="md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto md:pr-1.5 pb-6">
+          {/* Persistent Split-Pane Workspace: Left Scrollable Controls + Right Persistent Preview Panel */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start md:flex-1 md:min-h-0 md:overflow-hidden">
+            {/* Left Column: Receipt & Printer Controls (7 cols, independently scrollable) */}
+            <div className="md:col-span-7 flex flex-col gap-4 md:h-full md:overflow-y-auto md:pr-1.5 pb-6">
           {/* 0. POS COLOR COMBINATION STUDIO */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
@@ -1874,6 +1950,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings: initialSet
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Erase All Bills Confirmation Modal */}
       {showEraseBillsModal && (

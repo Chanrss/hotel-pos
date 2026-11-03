@@ -1223,12 +1223,12 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
   };
 
   return (
-    <div className="flex flex-col min-h-full lg:h-full bg-[#F8FAFC] text-slate-900 p-1.5 sm:p-3.5 gap-1.5 sm:gap-3 overflow-y-auto lg:overflow-hidden pb-2 sm:pb-4">
+    <div className="flex flex-col h-full w-full max-w-full bg-[#F8FAFC] text-slate-900 p-1.5 sm:p-3.5 gap-1.5 sm:gap-3 overflow-hidden box-border">
       
       {/* Top Header & Tab Switcher - Navy Blue Enterprise Header */}
-      <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 bg-[#0F172A] text-white border border-slate-800 p-2 sm:p-3 rounded-xl shadow-sm shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5 bg-[#0F172A] text-white border border-slate-800 p-2 sm:p-3 rounded-xl shadow-sm shrink-0">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
             <ChefHat className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />
           </div>
           <div className="min-w-0">
@@ -1241,21 +1241,21 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="grid grid-cols-3 sm:flex items-center gap-1 sm:gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={() => {
               setAppendingKot(null);
               setActiveTab('running');
               if (onTabChange) onTabChange('running');
             }}
-            className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] ${
+            className={`btn-compact h-8 sm:h-9 px-2 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] whitespace-nowrap ${
               activeTab === 'running'
                 ? 'bg-emerald-600 text-white shadow-xs font-black'
                 : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Running ({runningKots.filter(k => k.kot.status !== 'BILLED' && k.kot.status !== 'CANCELLED').length})</span>
+            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">Running ({runningKots.filter(k => k.kot.status !== 'BILLED' && k.kot.status !== 'CANCELLED').length})</span>
           </button>
 
           <button
@@ -1264,7 +1264,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
               setActiveTab('queue');
               if (onTabChange) onTabChange('queue');
             }}
-            className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] ${
+            className={`btn-compact h-8 sm:h-9 px-2 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] whitespace-nowrap ${
               activeTab === 'queue'
                 ? 'bg-emerald-600 text-white shadow-xs font-black'
                 : pendingPrintKots.length > 0
@@ -1273,10 +1273,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             }`}
             title="Pending KOT Thermal Print Queue"
           >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print Queue</span>
+            <Printer className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">Queue</span>
             <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black shrink-0 ${
                 activeTab === 'queue'
                   ? 'bg-[#0F172A] text-emerald-400'
                   : pendingPrintKots.length > 0
@@ -1295,14 +1295,14 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
               setActiveTab('create');
               if (onTabChange) onTabChange('create');
             }}
-            className={`h-8 sm:h-9 px-2.5 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] ${
+            className={`btn-compact h-8 sm:h-9 px-2 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation active:scale-[0.98] whitespace-nowrap ${
               activeTab === 'create' && !appendingKot
                 ? 'bg-white text-[#0F172A] shadow-xs font-black'
                 : 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white border border-emerald-500/40'
             }`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New KOT</span>
+            <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">New KOT</span>
           </button>
         </div>
       </div>
@@ -1321,25 +1321,26 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
       {/* TAB 1: RUNNING KOTS VIEW */}
       {activeTab === 'running' && (
-        <div className="flex flex-col flex-1 gap-3 overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 gap-1.5 sm:gap-3 overflow-hidden">
           
           {/* Rush Hour Kitchen Item Demand Aggregator */}
           {rushDemandSummary.length > 0 && (
-            <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-2.5 shadow-sm shrink-0">
-              <div className="flex items-center justify-between mb-1.5 px-0.5">
-                <span className="text-[11px] font-black tracking-wider uppercase text-emerald-400 flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-emerald-400" />
-                  Live Kitchen Preparation Demand (All Active Tables)
+            <div className="bg-[#0F172A] border border-slate-800 rounded-xl p-2 sm:p-2.5 shadow-sm shrink-0">
+              <div className="flex items-center justify-between mb-1 sm:mb-1.5 px-0.5 gap-2">
+                <span className="text-[10px] sm:text-[11px] font-black tracking-wider uppercase text-emerald-400 flex items-center gap-1 truncate">
+                  <Flame className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="sm:hidden">Kitchen Demand</span>
+                  <span className="hidden sm:inline">Live Kitchen Preparation Demand (All Active Tables)</span>
                 </span>
-                <span className="text-[10px] text-slate-300 font-mono">
-                  {rushDemandSummary.reduce((acc, i) => acc + i.qty, 0)} items to prepare
+                <span className="text-[10px] text-slate-300 font-mono shrink-0">
+                  {rushDemandSummary.reduce((acc, i) => acc + i.qty, 0)} items
                 </span>
               </div>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 no-scrollbar">
                 {rushDemandSummary.map((item, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700 text-xs shrink-0 font-medium"
+                    className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700 text-xs shrink-0 font-medium"
                   >
                     <span className="text-white font-bold">{item.name}</span>
                     <span className="bg-emerald-500/20 text-emerald-300 font-mono font-black px-1.5 py-0.2 rounded text-xs border border-emerald-500/30">
@@ -1352,9 +1353,9 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           )}
 
           {/* Status Filter Bar & Select All Control */}
-          <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 bg-white p-1.5 sm:p-2 rounded-xl border border-slate-200 text-xs shrink-0 shadow-2xs">
-            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full no-scrollbar">
-              <span className="text-slate-600 font-bold px-1.5 text-[11px] sm:text-xs flex items-center gap-1 shrink-0">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 bg-white p-1.5 sm:p-2 rounded-xl border border-slate-200 text-xs shrink-0 shadow-2xs">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto flex-1 min-w-0 no-scrollbar">
+              <span className="hidden sm:flex text-slate-600 font-bold px-1.5 text-xs items-center gap-1 shrink-0">
                 <Filter className="w-3 h-3 text-emerald-600" /> Status:
               </span>
               {[
@@ -1371,7 +1372,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 <button
                   key={st.id}
                   onClick={() => setStatusFilter(st.id)}
-                  className={`px-2.5 py-1 h-7 sm:h-8 rounded-lg text-[11px] sm:text-xs font-semibold cursor-pointer transition-colors shrink-0 flex items-center gap-1 ${
+                  className={`btn-compact px-2 sm:px-2.5 py-1 h-7 sm:h-8 rounded-lg text-[11px] sm:text-xs font-semibold cursor-pointer transition-colors shrink-0 flex items-center gap-1 whitespace-nowrap ${
                     statusFilter === st.id
                       ? 'bg-[#0F172A] text-white font-bold shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200'
@@ -1393,11 +1394,11 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
             {/* Select All Toggle for active KOTs */}
             {eligibleVisibleKots.length > 0 && (
-              <div className="flex items-center gap-1.5 ml-auto shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={handleToggleSelectAll}
-                  className={`px-2.5 py-1 h-7 sm:h-8 rounded-lg text-[11px] sm:text-xs font-bold border transition-colors flex items-center gap-1 cursor-pointer shrink-0 ${
+                  className={`btn-compact px-2 sm:px-2.5 py-1 h-7 sm:h-8 rounded-lg text-[11px] sm:text-xs font-bold border transition-colors flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                     isAllEligibleSelected
                       ? 'bg-emerald-600 text-white border-emerald-600 font-black'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
@@ -1405,7 +1406,8 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   title="Select or deselect all active kitchen orders in view"
                 >
                   {isAllEligibleSelected ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
-                  <span>{isAllEligibleSelected ? 'Deselect All' : `Select All (${eligibleVisibleKots.length})`}</span>
+                  <span className="hidden xs:inline">{isAllEligibleSelected ? 'Deselect All' : `Select All (${eligibleVisibleKots.length})`}</span>
+                  <span className="xs:hidden">{isAllEligibleSelected ? 'None' : 'All'}</span>
                 </button>
               </div>
             )}
@@ -1451,10 +1453,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           )}
 
           {/* Running KOTs Cards Grid - Responsive CSS grid optimized for mobile and kitchen screens */}
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 sm:pr-1 pb-2">
             {filteredKots.length === 0 ? (
-              <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-slate-500 text-center p-8 space-y-3 bg-slate-900/40 rounded-xl border border-slate-800">
-                <ChefHat className="w-14 h-14 text-slate-700 stroke-1" />
+              <div className="h-full min-h-[220px] sm:min-h-[300px] flex flex-col items-center justify-center text-slate-500 text-center p-6 sm:p-8 space-y-3 bg-slate-900/40 rounded-xl border border-slate-800">
+                <ChefHat className="w-12 h-12 sm:w-14 sm:h-14 text-slate-700 stroke-1" />
                 <div>
                   <p className="font-bold text-sm text-slate-400">No Kitchen Orders Found</p>
                   <p className="text-xs text-slate-600 max-w-sm mt-1">
@@ -1469,7 +1471,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 </button>
               </div>
             ) : (
-              <div className="kot-card-grid w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1920px]:grid-cols-6 min-[2560px]:grid-cols-7 gap-2.5 sm:gap-3.5">
+              <div className="kot-card-grid w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1920px]:grid-cols-6 min-[2560px]:grid-cols-7 gap-2 sm:gap-3.5">
                 {filteredKots.map(({ kot, items }) => {
                   const effectiveItems = (items && items.length > 0) ? items : (kot.items || []);
                   const totalItemCount = effectiveItems.reduce((acc, i) => acc + i.quantity, 0);
@@ -1479,7 +1481,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   return (
                     <div
                       key={kot.id}
-                      className={`bg-slate-900 border rounded-xl p-3 sm:p-4 flex flex-col justify-between shadow-md space-y-2.5 sm:space-y-3 transition-all ${
+                      className={`bg-slate-900 border rounded-xl p-2.5 sm:p-4 flex flex-col justify-between shadow-md space-y-2 sm:space-y-3 transition-all ${
                         isSelected
                           ? 'border-emerald-500 ring-2 ring-emerald-500/80 bg-slate-900/95 shadow-emerald-950/40'
                           : elapsed.isUrgent && kot.status !== 'BILLED' && kot.status !== 'CANCELLED' && kot.status !== 'COMPLETED' && kot.status !== 'READY'
@@ -1704,7 +1706,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                       )}
 
                       {/* Action Footer Bar */}
-                      <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-800">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 pt-1.5 border-t border-slate-800">
                         
                         {/* Status Select dropdown (Reduced secondary control size) */}
                         {kot.status !== 'BILLED' && (
@@ -1712,7 +1714,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             value={kot.status || 'OPEN'}
                             aria-label="Update KOT Status"
                             onChange={(e) => handleUpdateKotStatus(kot.id, e.target.value as KotStatus)}
-                            className="bg-slate-800 text-[10px] sm:text-[11px] font-semibold text-slate-300 border border-slate-700 rounded-md px-1.5 py-1 h-7 focus:outline-none cursor-pointer"
+                            className="bg-slate-800 text-[10px] sm:text-[11px] font-semibold text-slate-300 border border-slate-700 rounded-md px-1.5 py-1 h-7 focus:outline-none cursor-pointer shrink-0"
                           >
                             <option value="OPEN">Status: OPEN</option>
                             <option value="SENT">Status: SENT</option>
@@ -1723,7 +1725,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           </select>
                         )}
 
-                        <div className="flex items-center gap-1.5 ml-auto">
+                        <div className="flex items-center gap-1 sm:gap-1.5 ml-auto shrink-0">
                           
                           {/* Dedicated Physical Thermal Print Button for Kitchen Staff */}
                           <button
@@ -1731,10 +1733,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             onClick={() => {
                               void handleSetKotPrintStatus(kot, effectiveItems, 'PRINTED', true);
                             }}
-                            className="px-2 py-1.5 h-7 sm:h-8 bg-slate-800 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-400 hover:text-amber-300 font-bold text-xs rounded-md border border-slate-700 hover:border-amber-500/50 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
+                            className="btn-compact px-2 py-1 h-7 sm:h-8 bg-slate-800 hover:bg-amber-500/20 active:bg-amber-500/30 text-amber-400 hover:text-amber-300 font-bold text-[11px] sm:text-xs rounded-md border border-slate-700 hover:border-amber-500/50 cursor-pointer transition-all flex items-center gap-1 shrink-0 shadow-xs touch-manipulation active:scale-95"
                             title={`Print physical thermal ticket for KOT #${kot.kotNumber} (Kitchen Preparation Ticket)`}
                           >
-                            <Printer className="w-3.5 h-3.5 text-amber-400" />
+                            <Printer className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
                             <span>Print</span>
                             {kot.printCount && kot.printCount > 1 ? (
                               <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono font-bold">
@@ -1748,10 +1750,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             type="button"
                             disabled={remotePrintingKotId === kot.id}
                             onClick={() => void handleSendKotToCounterPrinter(kot, effectiveItems)}
-                            className="px-2 py-1.5 h-7 sm:h-8 bg-emerald-950/60 hover:bg-emerald-900/80 active:bg-emerald-800/80 text-emerald-300 font-bold text-xs rounded-md border border-emerald-600/40 cursor-pointer transition-all flex items-center gap-1.5 shrink-0 shadow-xs touch-manipulation active:scale-95"
+                            className="btn-compact px-2 py-1 h-7 sm:h-8 bg-emerald-950/60 hover:bg-emerald-900/80 active:bg-emerald-800/80 text-emerald-300 font-bold text-[11px] sm:text-xs rounded-md border border-emerald-600/40 cursor-pointer transition-all flex items-center gap-1 shrink-0 shadow-xs touch-manipulation active:scale-95"
                             title="Queue thermal print on Primary Counter Terminal via Firestore"
                           >
-                            <Radio className={`w-3.5 h-3.5 text-emerald-400 ${remotePrintingKotId === kot.id ? 'animate-spin' : ''}`} />
+                            <Radio className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 ${remotePrintingKotId === kot.id ? 'animate-spin' : ''}`} />
                             <span className="hidden xs:inline">{remotePrintingKotId === kot.id ? 'Queueing...' : 'To Counter'}</span>
                           </button>
 
@@ -1761,11 +1763,11 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                               type="button"
                               onClick={() => handlePushKotToBilling(kot, effectiveItems)}
                               disabled={submitting}
-                              className="px-3 py-1.5 h-7 sm:h-8 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white rounded-md text-xs font-black flex items-center gap-1 shadow-md shadow-emerald-600/20 transition-colors cursor-pointer"
+                              className="btn-compact px-2.5 sm:px-3 py-1 h-7 sm:h-8 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white rounded-md text-[11px] sm:text-xs font-black flex items-center gap-1 shadow-md shadow-emerald-600/20 transition-colors cursor-pointer whitespace-nowrap"
                               title="Settle order and convert to finalized Bill"
                             >
                               <span>Bill Now</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
+                              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                           )}
                         </div>
@@ -1786,47 +1788,47 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
       {activeTab === 'queue' && (
         <div
           id="pending-kot-print-queue-view"
-          className="flex flex-col flex-1 gap-3 overflow-hidden"
+          className="flex flex-col flex-1 min-h-0 gap-1.5 sm:gap-3 overflow-hidden"
         >
           {/* Queue Summary & Action Header */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
-            <div className="bg-slate-900 border border-amber-500/40 rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                  Pending Print KOTs
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2.5 shrink-0">
+            <div className="bg-slate-900 border border-amber-500/40 rounded-xl p-2 sm:p-3 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-400 truncate">
+                  Pending Print
                 </div>
-                <div className="text-2xl font-black text-white mt-0.5 font-mono">
+                <div className="text-lg sm:text-2xl font-black text-white mt-0.5 font-mono leading-none">
                   {pendingPrintKots.length}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  {totalPendingPrintItemsCount} item(s) waiting for thermal print
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
+                  {totalPendingPrintItemsCount} item(s) waiting
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
-                <Printer className="w-5 h-5" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+            <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-2 sm:p-3 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-400 truncate">
                   Printed KOTs
                 </div>
-                <div className="text-2xl font-black text-white mt-0.5 font-mono">
+                <div className="text-lg sm:text-2xl font-black text-white mt-0.5 font-mono leading-none">
                   {printedQueueKots.length}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
-                  Dispatched to kitchen thermal printer
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
+                  Dispatched to kitchen
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="col-span-2 sm:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-3 flex flex-row sm:flex-col items-center sm:items-stretch justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Batch Thermal Dispatch
                 </span>
                 <span className="text-[10px] font-mono text-amber-300">
@@ -1837,22 +1839,22 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 type="button"
                 disabled={pendingPrintKots.length === 0 || batchPrintingQueue}
                 onClick={handlePrintAllPendingKots}
-                className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 text-slate-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-md"
+                className="btn-compact sm:w-full py-1.5 sm:py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer transition-colors shadow-md whitespace-nowrap shrink-0"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>
                   {batchPrintingQueue
-                    ? 'Printing Queue...'
-                    : `Print All Pending (${pendingPrintKots.length})`}
+                    ? 'Printing...'
+                    : `Print All (${pendingPrintKots.length})`}
                 </span>
               </button>
             </div>
           </div>
 
           {/* Filter Bar for Print Status (Pending / Printed / All) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800 text-xs shrink-0">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              <span className="text-slate-400 font-bold px-1.5 text-xs flex items-center gap-1 shrink-0">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 bg-slate-900 p-1.5 sm:p-2 rounded-xl border border-slate-800 text-xs shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
+              <span className="hidden sm:flex text-slate-400 font-bold px-1.5 text-xs items-center gap-1 shrink-0">
                 <Filter className="w-3.5 h-3.5 text-amber-400" /> Queue Status:
               </span>
               {[
@@ -1868,7 +1870,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 },
                 {
                   id: 'ALL' as const,
-                  label: 'All KOTs (Pending & Printed)',
+                  label: 'All KOTs',
                   count: kotPrintQueue.length
                 }
               ].map((tab) => (
@@ -1876,7 +1878,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   key={tab.id}
                   type="button"
                   onClick={() => setQueueFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 shrink-0 ${
+                  className={`btn-compact px-2.5 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 rounded-lg text-[11px] sm:text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                     queueFilter === tab.id
                       ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
                       : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
@@ -1898,7 +1900,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           </div>
 
           {/* Queue Cards List */}
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 sm:pr-1 pb-2">
             {filteredPrintQueue.length === 0 ? (
               <div className="h-full min-h-[260px] flex flex-col items-center justify-center text-slate-400 text-center p-8 space-y-2.5 bg-slate-900/40 rounded-xl border border-slate-800">
                 <CheckCircle2 className="w-12 h-12 text-emerald-500/70 stroke-1" />
@@ -2019,15 +2021,15 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                       </div>
 
                       {/* Queue Card Footer Controls */}
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
+                      <div className="pt-2 border-t border-slate-800 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2">
+                        <div className="flex items-center gap-1 sm:gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
                               setPreviewKotData({ kot, items });
                               setIsKotModalOpen(true);
                             }}
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            className="btn-compact px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
                             title="Preview Thermal KOT Slip"
                           >
                             <Eye className="w-3.5 h-3.5 text-amber-400" />
@@ -2044,22 +2046,22 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                                 false
                               )
                             }
-                            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold cursor-pointer transition-colors"
+                            className="btn-compact px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold cursor-pointer transition-colors whitespace-nowrap"
                           >
-                            {isPending ? 'Mark Printed' : 'Re-queue Pending'}
+                            {isPending ? 'Mark Printed' : 'Re-queue'}
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 sm:gap-1.5 ml-auto">
                           <button
                             type="button"
                             disabled={remotePrintingKotId === kot.id}
                             onClick={() => void handleSendKotToCounterPrinter(kot, items)}
-                            className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs"
+                            className="btn-compact px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/40 text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-colors shadow-xs whitespace-nowrap"
                             title="Queue thermal print on Primary POS Counter Terminal via Firestore"
                           >
                             <Radio className={`w-3.5 h-3.5 text-emerald-400 ${remotePrintingKotId === kot.id ? 'animate-spin' : ''}`} />
-                            <span>{remotePrintingKotId === kot.id ? 'Queueing...' : 'To Counter POS'}</span>
+                            <span>{remotePrintingKotId === kot.id ? 'Queueing...' : 'To Counter'}</span>
                           </button>
 
                           <button
@@ -2068,7 +2070,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             onClick={() =>
                               handleSetKotPrintStatus(kot, items, 'PRINTED', true)
                             }
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-colors shadow-xs ${
+                            className={`btn-compact px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-black flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-colors shadow-xs whitespace-nowrap ${
                               isPending
                                 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                                 : 'bg-slate-800 hover:bg-slate-700 text-white'
@@ -2080,7 +2082,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                                 ? 'Printing...'
                                 : isPending
                                 ? 'Print Local'
-                                : 'Reprint Local'}
+                                : 'Reprint'}
                             </span>
                           </button>
                         </div>
@@ -2096,13 +2098,13 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
       {/* TAB 2: CREATE / APPEND KOT FORM */}
       {activeTab === 'create' && (
-        <div className="flex flex-col flex-1 overflow-hidden gap-1.5 sm:gap-2">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-1.5 sm:gap-2">
           
           {/* Mobile Tab Switcher for Create KOT: Catalog vs Ticket */}
           <div className="lg:hidden flex items-center bg-slate-900 border border-slate-800 p-1 rounded-lg shrink-0 gap-1">
             <button
               onClick={() => setCreateMobileTab('menu')}
-              className={`flex-1 py-1.5 h-8 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 touch-manipulation cursor-pointer ${
+              className={`btn-compact flex-1 py-1.5 h-8 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 touch-manipulation cursor-pointer ${
                 createMobileTab === 'menu'
                   ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
                   : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
@@ -2113,7 +2115,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             </button>
             <button
               onClick={() => setCreateMobileTab('ticket')}
-              className={`flex-1 py-1.5 h-8 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 touch-manipulation cursor-pointer ${
+              className={`btn-compact flex-1 py-1.5 h-8 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 touch-manipulation cursor-pointer ${
                 createMobileTab === 'ticket'
                   ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
                   : 'text-slate-400 hover:text-white bg-slate-950/60 border border-slate-800'
@@ -2131,10 +2133,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 sm:gap-3 flex-1 overflow-hidden relative">
+          <div className="flex flex-col lg:grid lg:grid-cols-12 gap-2 sm:gap-3 flex-1 min-h-0 overflow-hidden relative">
             
             {/* Left Column: Menu Catalog & Search (7 Cols) */}
-            <div className={`lg:col-span-7 flex-col bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-3.5 gap-2 overflow-hidden ${
+            <div className={`lg:col-span-7 flex-1 min-h-0 flex-col bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-3.5 gap-1.5 sm:gap-2 overflow-hidden ${
               createMobileTab === 'menu' ? 'flex' : 'hidden lg:flex'
             }`}>
             
@@ -2188,7 +2190,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
               <button
                 type="button"
                 onClick={() => setSelectedCategory('all')}
-                className={`px-2.5 py-1 h-7 rounded-md font-bold shrink-0 cursor-pointer transition-colors touch-manipulation text-[11px] sm:text-xs ${
+                className={`btn-compact px-2.5 py-1 h-7 rounded-md font-bold shrink-0 cursor-pointer transition-colors touch-manipulation text-[11px] sm:text-xs ${
                   selectedCategory === 'all'
                     ? 'bg-amber-500 text-slate-950 font-black'
                     : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -2201,7 +2203,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-2.5 py-1 h-7 rounded-md font-semibold shrink-0 cursor-pointer transition-colors touch-manipulation text-[11px] sm:text-xs ${
+                  className={`btn-compact px-2.5 py-1 h-7 rounded-md font-semibold shrink-0 cursor-pointer transition-colors touch-manipulation text-[11px] sm:text-xs ${
                     selectedCategory === cat.id
                       ? 'bg-amber-500 text-slate-950 font-bold'
                       : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -2213,7 +2215,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             </div>
 
             {/* Menu Items Grid - High density responsive CSS grid to show many items clearly on mobile */}
-            <div className="flex-1 overflow-y-auto grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-2.5 pr-0.5 pb-16 lg:pb-1">
+            <div className="flex-1 min-h-0 content-start overflow-y-auto grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2.5 pr-0.5 pb-14 lg:pb-1">
               {filteredMenuItems.map((item) => {
                 const price = BillingEngine.getApplicablePrice(item, priceType);
                 const inDraftQty = getItemDraftQuantity(item.id);
@@ -2223,7 +2225,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   <div
                     key={item.id}
                     onClick={() => handleAddItemToKot(item)}
-                    className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-slate-950 border text-left transition-all flex flex-col justify-between cursor-pointer group shadow-xs min-h-[72px] sm:min-h-[85px] touch-manipulation active:scale-[0.99] select-none ${
+                    className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-slate-950 border text-left transition-all flex flex-col justify-between cursor-pointer group shadow-xs min-h-[70px] sm:min-h-[85px] touch-manipulation active:scale-[0.99] select-none ${
                       isRecentlyAdded
                         ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-slate-900'
                         : inDraftQty > 0
@@ -2265,7 +2267,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <button
                             type="button"
                             onClick={(e) => handleQuickAdjustItemQty(item, -1, e)}
-                            className="w-5 h-5 flex items-center justify-center font-bold text-slate-300 hover:text-white active:bg-slate-800 rounded touch-manipulation cursor-pointer text-xs"
+                            className="btn-compact w-5 h-5 flex items-center justify-center font-bold text-slate-300 hover:text-white active:bg-slate-800 rounded touch-manipulation cursor-pointer text-xs"
                             title="Decrease quantity"
                           >
                             -
@@ -2276,7 +2278,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <button
                             type="button"
                             onClick={(e) => handleQuickAdjustItemQty(item, 1, e)}
-                            className="w-5 h-5 flex items-center justify-center font-bold text-emerald-400 hover:text-emerald-300 active:bg-slate-800 rounded touch-manipulation cursor-pointer text-xs"
+                            className="btn-compact w-5 h-5 flex items-center justify-center font-bold text-emerald-400 hover:text-emerald-300 active:bg-slate-800 rounded touch-manipulation cursor-pointer text-xs"
                             title="Increase quantity"
                           >
                             +
@@ -2294,13 +2296,13 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             </div>
 
             {/* Sticky View Ticket & Send Bar on Mobile in Catalog view */}
-            {selectedItems.length > 0 && (
+            {selectedItems.length > 0 && createMobileTab === 'menu' && (
               <div className="lg:hidden fixed bottom-2 left-2 right-2 sm:left-auto sm:right-4 sm:w-96 z-40">
                 <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 p-1.5 rounded-xl shadow-2xl flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setCreateMobileTab('ticket')}
-                    className="flex-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-amber-300 px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center justify-between border border-slate-700 cursor-pointer transition-colors touch-manipulation"
+                    className="btn-compact flex-1 bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-amber-300 px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center justify-between border border-slate-700 cursor-pointer transition-colors touch-manipulation"
                   >
                     <span className="flex items-center gap-1.5 truncate">
                       <ChefHat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -2313,7 +2315,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                     type="button"
                     onClick={() => handleCreateKot('counter')}
                     disabled={submitting}
-                    className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-600/30 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
+                    className="btn-compact bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 shadow-md shadow-emerald-600/30 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
                     title="Queue thermal print job on Primary Counter POS Terminal via Firestore"
                   >
                     <Radio className="w-3.5 h-3.5 text-white" />
@@ -2324,7 +2326,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                     type="button"
                     onClick={() => handleCreateKot(false)}
                     disabled={submitting}
-                    className="bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-200 px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 border border-slate-700 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
+                    className="btn-compact bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-200 px-2.5 py-2 h-9 rounded-lg font-bold text-xs flex items-center gap-1 border border-slate-700 cursor-pointer shrink-0 transition-all active:scale-[0.98] touch-manipulation"
                   >
                     <Send className="w-3.5 h-3.5 text-blue-400" />
                     <span>Send</span>
@@ -2336,24 +2338,24 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
           </div>
 
           {/* Right Column: New KOT Ticket Draft & Controls (5 Cols) */}
-          <div className={`lg:col-span-5 flex-col bg-slate-900 border border-slate-800 rounded-xl p-2.5 sm:p-4 gap-2 sm:gap-3 overflow-hidden shadow-xl ${
+          <div className={`lg:col-span-5 flex-1 min-h-0 flex-col bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-4 gap-1.5 sm:gap-3 overflow-hidden shadow-xl ${
             createMobileTab === 'ticket' ? 'flex' : 'hidden lg:flex'
           }`}>
             
             {/* Header / Mode Indicator */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 sm:pb-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <button
                   type="button"
                   onClick={() => setCreateMobileTab('menu')}
-                  className="lg:hidden px-2.5 py-1 h-7 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-300 rounded-md text-xs font-bold cursor-pointer mr-1 touch-manipulation flex items-center gap-1"
+                  className="btn-compact lg:hidden px-2.5 py-1 h-7 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-amber-300 rounded-md text-xs font-bold cursor-pointer mr-0.5 touch-manipulation flex items-center gap-1 shrink-0"
                   title="Back to menu"
                 >
                   <ArrowLeft className="w-3 h-3" />
                   <span>Menu</span>
                 </button>
-                <ChefHat className="w-4 h-4 text-amber-400" />
-                <h3 className="font-black text-sm text-slate-100">
+                <ChefHat className="w-4 h-4 text-amber-400 shrink-0" />
+                <h3 className="font-black text-xs sm:text-sm text-slate-100 truncate">
                   {appendingKot ? `Append to ${appendingKot.kotNumber}` : 'New KOT Ticket'}
                 </h3>
               </div>
@@ -2362,7 +2364,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                 <button
                   type="button"
                   onClick={handleCancelAppend}
-                  className="text-[11px] text-red-400 hover:bg-red-950/40 px-2 py-1 h-7 rounded-md flex items-center gap-1 cursor-pointer touch-manipulation transition-colors"
+                  className="btn-compact text-[11px] text-red-400 hover:bg-red-950/40 px-2 py-1 h-7 rounded-md flex items-center gap-1 cursor-pointer touch-manipulation transition-colors shrink-0"
                 >
                   <XCircle className="w-3 h-3" /> Cancel Append
                 </button>
@@ -2371,7 +2373,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   type="button"
                   onClick={() => setSelectedItems([])}
                   disabled={selectedItems.length === 0}
-                  className="text-[11px] text-slate-400 hover:text-red-400 disabled:opacity-30 px-2 py-1 h-7 rounded-md flex items-center gap-1 cursor-pointer touch-manipulation transition-colors"
+                  className="btn-compact text-[11px] text-slate-400 hover:text-red-400 disabled:opacity-30 px-2 py-1 h-7 rounded-md flex items-center gap-1 cursor-pointer touch-manipulation transition-colors shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" /> Clear
                 </button>
@@ -2380,18 +2382,18 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
 
             {/* Step 1: Table & Order Type Selection */}
             {!appendingKot && (
-              <div className="space-y-1.5 bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800 text-xs shrink-0">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+              <div className="space-y-1 sm:space-y-1.5 bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800 text-xs shrink-0">
+                <div className="flex justify-between items-center gap-2">
+                  <label className="text-[10px] sm:text-[11px] font-bold text-slate-300 uppercase tracking-wider truncate">
                     Select Table / Order Type
                   </label>
                   
                   {/* Price Type Toggle (Compact secondary control) */}
-                  <div className="flex items-center bg-slate-900 p-0.5 rounded border border-slate-700 text-[10px]">
+                  <div className="flex items-center bg-slate-900 p-0.5 rounded border border-slate-700 text-[10px] shrink-0">
                     <button
                       type="button"
                       onClick={() => setPriceType('NON_AC')}
-                      className={`px-2 py-0.5 h-6 rounded font-bold cursor-pointer touch-manipulation ${
+                      className={`btn-compact px-2 py-0.5 h-6 rounded font-bold cursor-pointer touch-manipulation ${
                         priceType === 'NON_AC' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
                       }`}
                     >
@@ -2400,7 +2402,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                     <button
                       type="button"
                       onClick={() => setPriceType('AC')}
-                      className={`px-2 py-0.5 h-6 rounded font-bold cursor-pointer touch-manipulation ${
+                      className={`btn-compact px-2 py-0.5 h-6 rounded font-bold cursor-pointer touch-manipulation ${
                         priceType === 'AC' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
                       }`}
                     >
@@ -2423,7 +2425,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           if (t === 'Take Away') setOrderType('TAKE_AWAY');
                           else setOrderType('DINE_IN');
                         }}
-                        className={`px-2 py-0.5 h-7 rounded-md text-xs font-mono font-bold border transition-colors cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation active:scale-[0.98] ${
+                        className={`btn-compact px-2 py-0.5 h-7 rounded-md text-xs font-mono font-bold border transition-colors cursor-pointer flex items-center gap-1 shrink-0 touch-manipulation active:scale-[0.98] ${
                           isSelected
                             ? 'bg-blue-600 text-white border-blue-400 shadow-xs'
                             : isOccupied
@@ -2459,26 +2461,26 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
               </div>
             )}
 
-            {/* Step 2: Selected KOT Items List Container - Increased font size & padding, clearly displaying at least 3-4 items */}
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-3 sm:p-4 rounded-xl border border-slate-800 min-h-[220px] sm:min-h-[180px] space-y-2">
+            {/* Step 2: Selected KOT Items List Container */}
+            <div className="flex-1 min-h-[100px] sm:min-h-[180px] overflow-y-auto divide-y divide-slate-800 bg-slate-950 p-2 sm:p-4 rounded-xl border border-slate-800 space-y-1.5 sm:space-y-2">
               {selectedItems.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs text-center p-6 space-y-2">
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs text-center p-4 sm:p-6 space-y-2">
                   <Utensils className="w-8 h-8 text-slate-700 stroke-1" />
                   <p className="font-semibold text-slate-400">KOT Draft is Empty</p>
                   <p className="text-slate-600 max-w-xs">
-                    Select dishes from the left menu or type code above to build kitchen ticket.
+                    Select dishes from the menu or type code above to build kitchen ticket.
                   </p>
                 </div>
               ) : (
                 selectedItems.map((sel, idx) => (
-                  <div key={idx} className="py-2 space-y-1.5 text-xs first:pt-0">
+                  <div key={idx} className="py-1.5 sm:py-2 space-y-1.5 text-xs first:pt-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-amber-400 text-xs bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 shrink-0 font-bold">
                             #{sel.item.itemCode}
                           </span>
-                          <span className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                          <span className="text-xs sm:text-base font-bold text-slate-100 truncate">
                             {sel.item.itemName}
                           </span>
                         </div>
@@ -2490,7 +2492,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <button
                             type="button"
                             onClick={() => handleUpdateItemQty(idx, -1)}
-                            className="w-7 h-7 sm:w-7 sm:h-7 flex items-center justify-center text-slate-300 hover:text-white font-bold text-sm active:bg-slate-800 rounded cursor-pointer touch-manipulation"
+                            className="btn-compact w-7 h-7 flex items-center justify-center text-slate-300 hover:text-white font-bold text-sm active:bg-slate-800 rounded cursor-pointer touch-manipulation"
                             title="Decrease quantity"
                           >
                             -
@@ -2501,7 +2503,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                           <button
                             type="button"
                             onClick={() => handleUpdateItemQty(idx, 1)}
-                            className="w-7 h-7 sm:w-7 sm:h-7 flex items-center justify-center text-slate-300 hover:text-white font-bold text-sm active:bg-slate-800 rounded cursor-pointer touch-manipulation"
+                            className="btn-compact w-7 h-7 flex items-center justify-center text-slate-300 hover:text-white font-bold text-sm active:bg-slate-800 rounded cursor-pointer touch-manipulation"
                             title="Increase quantity"
                           >
                             +
@@ -2511,7 +2513,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(idx)}
-                          className="w-7 h-7 sm:w-7 sm:h-7 flex items-center justify-center text-slate-400 hover:text-red-400 active:bg-red-500/20 active:text-red-400 rounded-md cursor-pointer touch-manipulation"
+                          className="btn-compact w-7 h-7 flex items-center justify-center text-slate-400 hover:text-red-400 active:bg-red-500/20 active:text-red-400 rounded-md cursor-pointer touch-manipulation"
                           title="Remove item"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -2529,7 +2531,7 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                             const newNote = sel.notes ? `${sel.notes}, ${preset}` : preset;
                             handleUpdateItemNote(idx, newNote);
                           }}
-                          className="text-[10px] sm:text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-300 px-2 py-0.5 h-6 rounded-md border border-slate-800 cursor-pointer touch-manipulation active:bg-amber-500 active:text-slate-950"
+                          className="btn-compact text-[10px] sm:text-[11px] bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-300 px-2 py-0.5 h-6 rounded-md border border-slate-800 cursor-pointer touch-manipulation active:bg-amber-500 active:text-slate-950"
                         >
                           +{preset}
                         </button>
@@ -2550,23 +2552,23 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
             </div>
 
             {/* Total Items Summary & Dispatch Buttons */}
-            <div className="bg-slate-950 p-2.5 sm:p-3 rounded-xl border border-slate-800 space-y-2 pb-16 sm:pb-3 shrink-0">
+            <div className="bg-slate-950 p-2 sm:p-3 rounded-xl border border-slate-800 space-y-1.5 sm:space-y-2 shrink-0">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-bold">TOTAL DISHES TO DISPATCH:</span>
-                <span className="font-mono text-sm font-black text-amber-400">
+                <span className="text-slate-400 font-bold text-[11px] sm:text-xs">TOTAL DISHES TO DISPATCH:</span>
+                <span className="font-mono text-xs sm:text-sm font-black text-amber-400">
                   {selectedItems.reduce((sum, i) => sum + i.quantity, 0)} Items
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {/* Secondary action: Send KOT Only */}
                 <button
                   type="button"
                   onClick={() => handleCreateKot(false)}
                   disabled={selectedItems.length === 0 || submitting}
-                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-all active:scale-[0.98] touch-manipulation"
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-800 hover:bg-slate-700 active:bg-slate-650 disabled:opacity-50 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-all active:scale-[0.98] touch-manipulation whitespace-nowrap"
                 >
-                  <Send className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <Send className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400 shrink-0" />
                   <span className="truncate">Send Only</span>
                 </button>
 
@@ -2575,10 +2577,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   type="button"
                   onClick={() => handleCreateKot('counter')}
                   disabled={selectedItems.length === 0 || submitting}
-                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation"
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation whitespace-nowrap"
                   title="Queue thermal print on Primary Counter Terminal via Firestore queue"
                 >
-                  <Radio className="w-3.5 h-3.5 text-white shrink-0 animate-pulse" />
+                  <Radio className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white shrink-0 animate-pulse" />
                   <span className="truncate">To Counter</span>
                 </button>
 
@@ -2587,10 +2589,10 @@ export const KotManagement: React.FC<KotManagementProps> = ({ settings, initialS
                   type="button"
                   onClick={() => handleCreateKot(true)}
                   disabled={selectedItems.length === 0 || submitting}
-                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation"
+                  className="py-2 px-1.5 min-h-[38px] sm:min-h-[44px] rounded-lg text-[11px] sm:text-xs font-bold bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer transition-all active:scale-[0.98] touch-manipulation whitespace-nowrap"
                   title="Print directly to local thermal printer"
                 >
-                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <Printer className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Print Local</span>
                 </button>
               </div>

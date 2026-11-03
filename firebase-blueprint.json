@@ -296,6 +296,31 @@
         "errorMessage": { "type": "string" }
       },
       "required": ["id", "jobType", "status", "sourceDeviceId", "referenceNumber", "createdAt", "updatedAt"]
+    },
+    "UserDeviceSession": {
+      "title": "UserDeviceSession",
+      "description": "Active device session record linked to a Firestore user profile for multi-device POS session management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "username": { "type": "string" },
+        "userRole": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "osBrowserLabel": { "type": "string" },
+        "deviceType": { "type": "string", "enum": ["desktop", "mobile", "tablet"] },
+        "isPrimaryPrintServer": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ONLINE", "IDLE", "OFFLINE", "REVOKED"] },
+        "activeScreen": { "type": "string" },
+        "viewportSize": { "type": "string" },
+        "loginAt": { "type": "number" },
+        "lastActiveAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "deviceId", "deviceName", "status", "loginAt", "lastActiveAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -326,6 +351,10 @@
     "/user_activity_logs/{logId}": {
       "schema": "UserActivityLog",
       "description": "Dedicated audit log collection recording user management actions, visible only to admins"
+    },
+    "/user_sessions/{sessionId}": {
+      "schema": "UserDeviceSession",
+      "description": "Connected devices and active sessions linked to Firestore user profiles"
     }
   }
 }

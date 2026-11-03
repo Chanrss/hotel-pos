@@ -16,6 +16,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { DEFAULT_RESTAURANT_LOGO } from './data/defaultLogo';
 import { OFFICIAL_LOGO_STORAGE_PATH, OFFICIAL_LOGO_STORAGE_URL } from './services/brandLogoService';
+import { DeviceSessionService } from './services/deviceSessionService';
 import { Zap, ShoppingBag, ChefHat, Receipt, MoreHorizontal, LayoutDashboard } from 'lucide-react';
 
 // Lazy-loaded heavy modules for optimized bundle splitting & faster initial load
@@ -37,7 +38,7 @@ const ModuleLoadingFallback: React.FC = () => (
 );
 
 const AppContent: React.FC = () => {
-  const { currentUser, isOwner, isManager, isWaiter } = useAuth();
+  const { currentUser, isOwner, isManager, isWaiter, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('direct-billing');
   const [settings, setSettings] = useState<RestaurantSettings | undefined>(undefined);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -268,6 +269,27 @@ const AppContent: React.FC = () => {
       setActiveTab('direct-billing');
     }
   }, [currentUser?.roleId]);
+
+  // Register and heartbeat connected device session in Firestore for the logged-in user profile
+  useEffect(() => {
+    if (!currentUser) return;
+    const stopHeartbeat = DeviceSessionService.startSessionHeartbeat(
+      currentUser,
+      activeTab,
+      () => {
+        void logout();
+      }
+    );
+    return () => {
+      stopHeartbeat();
+    };
+  }, [currentUser?.uid, currentUser?.roleId]);
+
+  // Broadcast active screen updates to Firestore session record
+  useEffect(() => {
+    if (!currentUser) return;
+    DeviceSessionService.updateActiveScreen(currentUser, activeTab);
+  }, [activeTab, currentUser?.uid]);
 
   if (!currentUser) {
     return (

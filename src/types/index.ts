@@ -745,3 +745,24 @@ export interface SecurityAuditLogEntry {
   deviceId?: string;
   metadata?: Record<string, any>;
 }
+
+export interface UserDeviceSession {
+  id: string; // `${userId}_${deviceId}`
+  userId: string;
+  userName: string;
+  userEmail: string;
+  username?: string;
+  userRole: string;
+  deviceId: string;
+  deviceName: string;
+  osBrowserLabel: string;
+  deviceType: 'desktop' | 'mobile' | 'tablet';
+  isPrimaryPrintServer: boolean;
+  status: 'ONLINE' | 'IDLE' | 'OFFLINE' | 'REVOKED';
+  activeScreen?: string;
+  viewportSize?: string;
+  loginAt: number;
+  lastActiveAt: number;
+  updatedAt: number;
+}
+
